@@ -75,7 +75,7 @@
 
 **Test Command**: `pytest tests/test_web_ui.py`
 
-**Status**: [ ] TODO
+**Status**: [x] DONE
 
 ---
 
