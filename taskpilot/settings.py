@@ -31,6 +31,7 @@ INSTALLED_APPS = [
     "tasks",
     "audit",
     "web",
+    "users",
 ]
 
 MIDDLEWARE = [
@@ -125,3 +126,6 @@ DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
 # Telegram Bot
 TELEGRAM_BOT_TOKEN = config('TELEGRAM_BOT_TOKEN', default='')
+
+# Base URL for invitation links
+BASE_URL = config('BASE_URL', default='http://localhost:8000')

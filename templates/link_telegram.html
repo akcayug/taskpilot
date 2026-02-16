@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+
+{% block title %}Link Telegram - TaskPilot{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i data-lucide="message-circle" class="icon-sm"></i>
+                        Link Telegram Account
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if telegram_linked %}
+                    <div class="alert alert-success">
+                        <i data-lucide="check-circle" class="icon-sm"></i>
+                        Your Telegram account is already linked!
+                    </div>
+                    {% else %}
+                    <p>Link your Telegram account to receive task notifications and manage tasks via the bot.</p>
+
+                    <div class="alert alert-info">
+                        <h6><strong>Instructions:</strong></h6>
+                        <ol class="mb-0">
+                            <li>Open Telegram and find <strong>@TaskPilotBot</strong></li>
+                            <li>Start a conversation with the bot</li>
+                            <li>Send the command: <code>/link {{ link_code }}</code></li>
+                        </ol>
+                    </div>
+
+                    <div class="text-center my-4">
+                        <div class="p-4 bg-light rounded">
+                            <p class="text-muted mb-2">Your linking code:</p>
+                            <h2 class="mb-0 font-monospace text-primary" id="linkCode">{{ link_code }}</h2>
+                        </div>
+                    </div>
+
+                    <div class="text-center">
+                        <button class="btn btn-outline-primary" id="refreshCodeBtn">
+                            <i data-lucide="refresh-cw" class="icon-sm"></i>
+                            Generate New Code
+                        </button>
+                    </div>
+
+                    <div class="mt-4">
+                        <small class="text-muted">
+                            <i data-lucide="info" class="icon-sm"></i>
+                            This code expires in 24 hours. Generate a new code if it expires.
+                        </small>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    $('#refreshCodeBtn').on('click', function() {
+        $.ajax({
+            url: '{% url "refresh_telegram_code" %}',
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            success: function(data) {
+                if (data.success) {
+                    $('#linkCode').text(data.code);
+                    lucide.createIcons();
+                }
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

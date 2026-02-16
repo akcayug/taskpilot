@@ -22,5 +22,6 @@ from core.views import healthz
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("healthz", healthz, name="healthz"),
+    path("", include("users.urls")),
     path("", include("web.urls")),
 ]
