@@ -24,7 +24,7 @@
 
 **Test Command**: `pytest tests/test_tenant_isolation.py`
 
-**Status**: [ ] TODO
+**Status**: [x] DONE
 
 ---
 
