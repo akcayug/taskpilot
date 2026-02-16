@@ -127,7 +127,7 @@
 
 **Test Command**: `pytest tests/test_bot_handlers.py`
 
-**Status**: [ ] TODO
+**Status**: [x] DONE
 
 ---
 
