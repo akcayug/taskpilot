@@ -100,7 +100,7 @@
 
 **Test Command**: `pytest tests/test_invite_flow.py`
 
-**Status**: [ ] TODO
+**Status**: [x] DONE
 
 ---
 
