@@ -138,8 +138,9 @@ if not DEBUG:
     # Trust X-Forwarded-Proto header from reverse proxy (Coolify/Traefik)
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
-    # Force HTTPS redirects
-    SECURE_SSL_REDIRECT = True
+    # Note: SECURE_SSL_REDIRECT disabled - Coolify reverse proxy handles HTTPS enforcement
+    # Enabling this breaks internal Docker API calls (bot → web communication)
+    # SECURE_SSL_REDIRECT = True
 
     # Secure cookies
     SESSION_COOKIE_SECURE = True
