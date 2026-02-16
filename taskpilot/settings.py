@@ -105,7 +105,6 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
-STATICFILES_DIRS = [BASE_DIR / "static"]
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 # Default primary key field type
@@ -133,3 +132,30 @@ TELEGRAM_BOT_TOKEN = config('TELEGRAM_BOT_TOKEN', default='')
 
 # Base URL for invitation links
 BASE_URL = config('BASE_URL', default='http://localhost:8000')
+
+# HTTPS and Security Settings (Production)
+if not DEBUG:
+    # Trust X-Forwarded-Proto header from reverse proxy (Coolify/Traefik)
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+    # Force HTTPS redirects
+    SECURE_SSL_REDIRECT = True
+
+    # Secure cookies
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+
+    # CSRF trusted origins for API calls
+    CSRF_TRUSTED_ORIGINS = [
+        'https://taskpilot.ugurakcay.com',
+    ]
+
+    # HSTS (HTTP Strict Transport Security)
+    SECURE_HSTS_SECONDS = 31536000  # 1 year
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+
+    # Additional security headers
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_BROWSER_XSS_FILTER = True
+    X_FRAME_OPTIONS = 'DENY'
