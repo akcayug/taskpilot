@@ -1,4 +1,5 @@
 import csv
+import json
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -216,3 +217,262 @@ class ExportTasksView(LoginRequiredMixin, View):
             ])
 
         return response
+
+
+# Telegram Bot API Views
+
+class TelegramLinkAPIView(View):
+    """API endpoint for linking Telegram account"""
+
+    def post(self, request):
+        try:
+            data = json.loads(request.body)
+            code = data.get('code')
+            telegram_id = data.get('telegram_id')
+            telegram_username = data.get('telegram_username', '')
+
+            # Find link token
+            from users.models import TelegramLinkToken
+            from core.models import User
+
+            try:
+                token = TelegramLinkToken.objects.select_related('user').get(code=code)
+            except TelegramLinkToken.DoesNotExist:
+                return JsonResponse({'error': 'Invalid code'}, status=400)
+
+            if token.is_expired():
+                return JsonResponse({'error': 'Code expired'}, status=400)
+
+            # Update user with Telegram info
+            user = token.user
+            user.telegram_id = telegram_id
+            user.telegram_username = telegram_username
+            user.save()
+
+            # Delete token
+            token.delete()
+
+            return JsonResponse({
+                'success': True,
+                'user_id': user.id,
+                'email': user.email
+            })
+
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+
+
+class TelegramUserAPIView(View):
+    """API endpoint to get user by Telegram ID"""
+
+    def get(self, request, telegram_id):
+        from core.models import User
+
+        try:
+            user = User.objects.get(telegram_id=telegram_id)
+            return JsonResponse({
+                'id': user.id,
+                'email': user.email,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'telegram_username': user.telegram_username
+            })
+        except User.DoesNotExist:
+            return JsonResponse({'error': 'User not found'}, status=404)
+
+
+class TelegramTasksAPIView(View):
+    """API endpoint for bot to get user's tasks"""
+
+    def get(self, request):
+        telegram_id = request.GET.get('telegram_id')
+
+        if not telegram_id:
+            return JsonResponse({'error': 'telegram_id required'}, status=400)
+
+        from core.models import User
+        from tasks.models import Task
+
+        try:
+            user = User.objects.get(telegram_id=telegram_id)
+        except User.DoesNotExist:
+            return JsonResponse({'error': 'User not linked'}, status=404)
+
+        # Get user's tenant
+        membership = user.memberships.select_related('tenant').first()
+        if not membership:
+            return JsonResponse({'tasks': []})
+
+        # Get user's assigned tasks
+        tasks = Task.objects.filter(
+            tenant=membership.tenant,
+            assignee=user
+        ).select_related('project').order_by('-created_at')[:50]
+
+        tasks_data = []
+        for task in tasks:
+            tasks_data.append({
+                'id': task.id,
+                'title': task.title,
+                'description': task.description,
+                'status': task.status,
+                'status_display': task.get_status_display(),
+                'priority': task.priority,
+                'project': task.project.name,
+                'due_date': task.due_date.isoformat() if task.due_date else None,
+            })
+
+        return JsonResponse({'tasks': tasks_data})
+
+    def post(self, request):
+        """Create a new task via bot"""
+        try:
+            data = json.loads(request.body)
+            telegram_id = data.get('telegram_id')
+            title = data.get('title')
+            project_id = data.get('project_id')
+            priority = data.get('priority', 'MEDIUM')
+
+            from core.models import User
+            from tasks.models import Task, Project
+
+            try:
+                user = User.objects.get(telegram_id=telegram_id)
+            except User.DoesNotExist:
+                return JsonResponse({'error': 'User not linked'}, status=404)
+
+            try:
+                project = Project.objects.get(id=project_id)
+            except Project.DoesNotExist:
+                return JsonResponse({'error': 'Project not found'}, status=404)
+
+            # Create task
+            task = Task.objects.create(
+                tenant=project.tenant,
+                project=project,
+                title=title,
+                assignee=user,
+                priority=priority,
+                status=Task.Status.TODO
+            )
+
+            return JsonResponse({
+                'id': task.id,
+                'title': task.title,
+                'status': task.status,
+                'status_display': task.get_status_display(),
+                'priority': task.priority,
+                'project': task.project.name
+            })
+
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+
+
+class TelegramTaskDetailAPIView(View):
+    """API endpoint for getting task details"""
+
+    def get(self, request, task_id):
+        telegram_id = request.GET.get('telegram_id')
+
+        if not telegram_id:
+            return JsonResponse({'error': 'telegram_id required'}, status=400)
+
+        from core.models import User
+        from tasks.models import Task
+
+        try:
+            user = User.objects.get(telegram_id=telegram_id)
+        except User.DoesNotExist:
+            return JsonResponse({'error': 'User not linked'}, status=404)
+
+        try:
+            task = Task.objects.select_related('project', 'assignee').get(
+                id=task_id,
+                assignee=user
+            )
+        except Task.DoesNotExist:
+            return JsonResponse({'error': 'Task not found'}, status=404)
+
+        return JsonResponse({
+            'id': task.id,
+            'title': task.title,
+            'description': task.description,
+            'status': task.status,
+            'status_display': task.get_status_display(),
+            'priority': task.priority,
+            'project': task.project.name,
+            'assignee': task.assignee.get_full_name() if task.assignee else None,
+            'due_date': task.due_date.isoformat() if task.due_date else None,
+        })
+
+
+class TelegramTaskStatusAPIView(View):
+    """API endpoint for updating task status"""
+
+    def patch(self, request, task_id):
+        try:
+            data = json.loads(request.body)
+            telegram_id = data.get('telegram_id')
+            new_status = data.get('status')
+
+            from core.models import User
+            from tasks.models import Task
+            from tasks.services import TaskService
+
+            try:
+                user = User.objects.get(telegram_id=telegram_id)
+            except User.DoesNotExist:
+                return JsonResponse({'error': 'User not linked'}, status=404)
+
+            try:
+                task = Task.objects.get(id=task_id, assignee=user)
+            except Task.DoesNotExist:
+                return JsonResponse({'error': 'Task not found'}, status=404)
+
+            # Update status via service (validates transitions)
+            TaskService.update_task_status(task, new_status, user)
+
+            return JsonResponse({
+                'id': task.id,
+                'title': task.title,
+                'status': task.status,
+                'status_display': task.get_status_display()
+            })
+
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+
+
+class TelegramProjectsAPIView(View):
+    """API endpoint to get user's projects"""
+
+    def get(self, request):
+        telegram_id = request.GET.get('telegram_id')
+
+        if not telegram_id:
+            return JsonResponse({'error': 'telegram_id required'}, status=400)
+
+        from core.models import User
+        from tasks.models import Project
+
+        try:
+            user = User.objects.get(telegram_id=telegram_id)
+        except User.DoesNotExist:
+            return JsonResponse({'error': 'User not linked'}, status=404)
+
+        membership = user.memberships.select_related('tenant').first()
+        if not membership:
+            return JsonResponse({'projects': []})
+
+        projects = Project.objects.filter(tenant=membership.tenant)
+
+        projects_data = []
+        for project in projects:
+            projects_data.append({
+                'id': project.id,
+                'name': project.name,
+                'description': project.description
+            })
+
+        return JsonResponse({'projects': projects_data})

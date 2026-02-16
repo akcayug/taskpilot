@@ -1,0 +1,21 @@
+FROM python:3.12-slim
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+# Set work directory
+WORKDIR /app
+
+# Install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy bot code
+COPY bot/ ./bot/
+
+# Expose healthz port
+EXPOSE 8001
+
+# Run bot with healthz server
+CMD python -c "from bot.healthz import start_healthz_server; from bot.main import main; start_healthz_server(); main()"
