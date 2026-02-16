@@ -47,7 +47,7 @@
 
 **Test Command**: `pytest tests/test_task_transitions.py`
 
-**Status**: [ ] TODO
+**Status**: [x] DONE
 
 ---
 
