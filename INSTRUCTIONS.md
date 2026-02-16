@@ -2,38 +2,52 @@
 
 ## Local Setup
 ```bash
-cp .env.example .env  # Edit with your values
-docker-compose build
+# 1. Configure environment
+cp .env.example .env  # Edit with your actual values
+
+# 2. Build and start all services
 docker-compose up -d
-docker-compose exec web python manage.py migrate
+
+# 3. Wait for services to be healthy (migrations run automatically)
+docker-compose ps
+
+# 4. Create superuser
 docker-compose exec web python manage.py createsuperuser
 ```
+
+**Note**: The web service automatically runs migrations on startup via entrypoint script.
 
 ## Environment Variables
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `DATABASE_URL` | PostgreSQL connection string | `postgres://user:pass@db:5432/taskpilot` |
-| `REDIS_URL` | Redis connection string | `redis://redis:6379/0` |
-| `SECRET_KEY` | Django secret key | `your-secret-key-here` |
+| `DB_NAME` | PostgreSQL database name | `taskpilot` |
+| `DB_USER` | PostgreSQL username | `taskpilot` |
+| `DB_PASSWORD` | PostgreSQL password | `changeme_in_production` |
+| `DATABASE_URL` | PostgreSQL connection string | `postgresql://user:pass@db:5432/taskpilot` |
+| `CELERY_BROKER_URL` | Celery broker URL | `redis://redis:6379/0` |
+| `CELERY_RESULT_BACKEND` | Celery result backend | `redis://redis:6379/0` |
+| `SECRET_KEY` | Django secret key (50+ chars) | `your-secret-key-here` |
 | `DEBUG` | Debug mode (False in production) | `False` |
-| `ALLOWED_HOSTS` | Comma-separated hosts | `localhost,taskpilot.com` |
+| `ALLOWED_HOSTS` | Comma-separated hosts | `*` (or `example.com,www.example.com`) |
 | `TELEGRAM_BOT_TOKEN` | Telegram bot API token | `1234567890:ABCdefGHI...` |
-| `EMAIL_HOST` | SMTP server | `smtp.gmail.com` |
-| `EMAIL_PORT` | SMTP port | `587` |
-| `EMAIL_HOST_USER` | SMTP username | `user@example.com` |
-| `EMAIL_HOST_PASSWORD` | SMTP password | `your-email-password` |
-| `EMAIL_USE_TLS` | Use TLS for email | `True` |
+| `WEB_SERVICE_URL` | Web service URL for bot | `http://web:8000` |
+| `EMAIL_HOST` | SMTP server (optional) | `smtp.gmail.com` |
+| `EMAIL_PORT` | SMTP port (optional) | `587` |
+| `EMAIL_HOST_USER` | SMTP username (optional) | `user@example.com` |
+| `EMAIL_HOST_PASSWORD` | SMTP password (optional) | `your-email-password` |
+| `EMAIL_USE_TLS` | Use TLS for email (optional) | `True` |
 
 ## Deployment (Coolify)
 1. Push code to Git repository
 2. Create new service in Coolify (Docker Compose type)
-3. Set environment variables in Coolify dashboard
+3. Set environment variables in Coolify dashboard (see .env.example)
 4. Configure persistent volumes:
-   - `postgres-data:/var/lib/postgresql/data`
-   - `redis-data:/data`
-5. Deploy and wait for all services to start
-6. Run migrations: `docker exec <web-container> python manage.py migrate`
-7. Create superuser: `docker exec -it <web-container> python manage.py createsuperuser`
+   - `postgres_data:/var/lib/postgresql/data`
+   - `redis_data:/data`
+5. Deploy and wait for all services to start (migrations run automatically)
+6. Create superuser: `docker exec -it <web-container> python manage.py createsuperuser`
+
+**Note**: Coolify will automatically map port 8000 from the web service to your domain.
 
 ## Healthz Contract
 Each service exposes `/healthz` endpoint:
@@ -43,9 +57,12 @@ Each service exposes `/healthz` endpoint:
 
 Example:
 ```bash
-curl http://localhost:8000/healthz  # Web service
-curl http://localhost:8001/healthz  # Bot service
+curl http://localhost:8000/healthz  # Web service (port 8000)
+curl http://localhost:8001/healthz  # Bot service (port 8001)
+curl http://localhost:8002/healthz  # Worker service (port 8002)
 ```
+
+All services include health checks in docker-compose.yml for automatic restart on failure.
 
 ## Common Errors
 
