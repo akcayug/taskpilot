@@ -21,8 +21,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code (bot needs access to Django models)
 COPY . .
 
+# Copy entrypoint script
+COPY scripts/entrypoint-bot.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 # Expose healthz port
 EXPOSE 8001
 
-# Run bot with healthz server
-CMD python -c "import os; os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'taskpilot.settings'); import django; django.setup(); from bot.healthz import run_healthz_background; from bot.main import main; run_healthz_background(); main()"
+# Run entrypoint script
+CMD ["/entrypoint.sh"]

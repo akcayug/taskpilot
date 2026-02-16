@@ -1,0 +1,35 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m venv:*)",
+      "Bash(venvScriptspython.exe -m pip install --upgrade pip)",
+      "Bash(venvScriptspip.exe install -r requirements.txt)",
+      "Bash(venv/Scripts/python.exe -m pip install:*)",
+      "Bash(venv/Scripts/pip.exe install:*)",
+      "Bash(venv/Scripts/django-admin.exe startproject:*)",
+      "Bash(venv/Scripts/python.exe manage.py startapp:*)",
+      "Bash(venv/Scripts/python.exe manage.py makemigrations:*)",
+      "Bash(venv/Scripts/python.exe manage.py migrate:*)",
+      "Bash(venv/Scripts/pytest.exe tests/test_tenant_isolation.py)",
+      "Bash(curl:*)",
+      "Bash(git add:*)",
+      "Bash(git restore:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nTASK-1: Django multi-tenant foundation with authentication\n\nImplemented complete multi-tenant architecture with:\n- Custom User model with email-based authentication\n- Tenant model for organization isolation\n- TenantMembership model with Manager/Member roles\n- TenantMiddleware for automatic tenant context enforcement\n- Django Admin for platform-level tenant management\n- /healthz endpoint with database connectivity check\n- Comprehensive test suite \\(17 tests passing\\)\n\nAll acceptance criteria met. PostgreSQL configured via environment variables.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(venv/Scripts/pytest.exe)",
+      "Bash(git commit:*)",
+      "Bash(venv/Scripts/pytest.exe tests/test_task_transitions.py -v)",
+      "Bash(venv/Scripts/pytest.exe -v)",
+      "Bash(venv/Scripts/pytest.exe tests/test_web_ui.py -v)",
+      "Bash(venv/Scripts/pytest.exe tests/test_invite_flow.py -v)",
+      "Bash(venv/Scripts/pytest.exe:*)",
+      "Bash(pytest:*)",
+      "Bash(pip install:*)",
+      "Bash(python manage.py migrate:*)",
+      "Bash(pip uninstall:*)",
+      "Bash(python -m pip:*)",
+      "Bash(ls:*)",
+      "Bash(git push:*)",
+      "Bash(python -c:*)"
+    ]
+  }
+}

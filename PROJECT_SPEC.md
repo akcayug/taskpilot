@@ -33,6 +33,7 @@ TaskPilot is a multi-tenant, Telegram-first task management system designed for 
 ## Tech Stack
 - Django
 - PostgreSQL
+- UI framework: Bootstrap 5 + DataTables + Lucide icons
 - Redis + Celery (scheduled jobs & reminders)
 - Separate Telegram Bot service
 - Docker Compose multi-service setup
