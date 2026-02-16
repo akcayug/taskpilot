@@ -202,4 +202,4 @@
 
 **Test Command**: `pytest tests/integration/`
 
-**Status**: [ ] TODO
+**Status**: [x] DONE
