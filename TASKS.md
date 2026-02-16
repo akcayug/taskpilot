@@ -151,7 +151,7 @@
 
 **Test Command**: `pytest tests/test_celery_tasks.py`
 
-**Status**: [ ] TODO
+**Status**: [x] DONE
 
 ---
 
