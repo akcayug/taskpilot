@@ -17,9 +17,9 @@ import django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'taskpilot.settings')
 django.setup()
 
-from bot.healthz import run_healthz_background
+from bot.healthz import start_healthz_server
 from bot.main import main
 
-run_healthz_background()
+start_healthz_server()
 main()
 "
