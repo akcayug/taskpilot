@@ -3,6 +3,8 @@ import json
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
 from django.views import View
 from django.views.generic import TemplateView
 from django.shortcuts import render, redirect
@@ -221,6 +223,7 @@ class ExportTasksView(LoginRequiredMixin, View):
 
 # Telegram Bot API Views
 
+@method_decorator(csrf_exempt, name='dispatch')
 class TelegramLinkAPIView(View):
     """API endpoint for linking Telegram account"""
 
@@ -262,6 +265,7 @@ class TelegramLinkAPIView(View):
             return JsonResponse({'error': str(e)}, status=500)
 
 
+@method_decorator(csrf_exempt, name='dispatch')
 class TelegramUserAPIView(View):
     """API endpoint to get user by Telegram ID"""
 
@@ -281,6 +285,7 @@ class TelegramUserAPIView(View):
             return JsonResponse({'error': 'User not found'}, status=404)
 
 
+@method_decorator(csrf_exempt, name='dispatch')
 class TelegramTasksAPIView(View):
     """API endpoint for bot to get user's tasks"""
 
@@ -369,6 +374,7 @@ class TelegramTasksAPIView(View):
             return JsonResponse({'error': str(e)}, status=500)
 
 
+@method_decorator(csrf_exempt, name='dispatch')
 class TelegramTaskDetailAPIView(View):
     """API endpoint for getting task details"""
 
@@ -407,6 +413,7 @@ class TelegramTaskDetailAPIView(View):
         })
 
 
+@method_decorator(csrf_exempt, name='dispatch')
 class TelegramTaskStatusAPIView(View):
     """API endpoint for updating task status"""
 
@@ -444,6 +451,7 @@ class TelegramTaskStatusAPIView(View):
             return JsonResponse({'error': str(e)}, status=500)
 
 
+@method_decorator(csrf_exempt, name='dispatch')
 class TelegramProjectsAPIView(View):
     """API endpoint to get user's projects"""
 
