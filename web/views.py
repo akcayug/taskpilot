@@ -351,13 +351,36 @@ class TelegramTasksAPIView(View):
             except Project.DoesNotExist:
                 return JsonResponse({'error': 'Project not found'}, status=404)
 
+            description = data.get('description', '')
+            assignee_id = data.get('assignee_id')
+            due_date = data.get('due_date')
+
+            # Determine assignee
+            assignee = user  # default to creator
+            if assignee_id is not None:
+                try:
+                    assignee = User.objects.get(id=assignee_id)
+                except User.DoesNotExist:
+                    assignee = user
+
+            # Parse due_date
+            parsed_due_date = None
+            if due_date:
+                from datetime import date as date_type
+                try:
+                    parsed_due_date = date_type.fromisoformat(due_date)
+                except ValueError:
+                    pass
+
             # Create task
             task = Task.objects.create(
                 tenant=project.tenant,
                 project=project,
                 title=title,
-                assignee=user,
+                description=description,
+                assignee=assignee,
                 priority=priority,
+                due_date=parsed_due_date,
                 status=Task.Status.TODO
             )
 
@@ -367,7 +390,10 @@ class TelegramTasksAPIView(View):
                 'status': task.status,
                 'status_display': task.get_status_display(),
                 'priority': task.priority,
-                'project': task.project.name
+                'project': task.project.name,
+                'assignee': task.assignee.get_full_name() if task.assignee else None,
+                'due_date': task.due_date.isoformat() if task.due_date else None,
+                'description': task.description,
             })
 
         except Exception as e:
@@ -449,6 +475,42 @@ class TelegramTaskStatusAPIView(View):
 
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class TelegramMembersAPIView(View):
+    """API endpoint to get tenant members for assignee selection"""
+
+    def get(self, request):
+        telegram_id = request.GET.get('telegram_id')
+
+        if not telegram_id:
+            return JsonResponse({'error': 'telegram_id required'}, status=400)
+
+        from core.models import User, TenantMembership
+
+        try:
+            user = User.objects.get(telegram_id=telegram_id)
+        except User.DoesNotExist:
+            return JsonResponse({'error': 'User not linked'}, status=404)
+
+        membership = user.memberships.select_related('tenant').first()
+        if not membership:
+            return JsonResponse({'members': []})
+
+        members = TenantMembership.objects.filter(
+            tenant=membership.tenant
+        ).select_related('user')
+
+        members_data = []
+        for m in members:
+            members_data.append({
+                'id': m.user.id,
+                'email': m.user.email,
+                'full_name': m.user.get_full_name(),
+            })
+
+        return JsonResponse({'members': members_data})
 
 
 @method_decorator(csrf_exempt, name='dispatch')

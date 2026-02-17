@@ -190,7 +190,7 @@ class TestNewTaskCommand:
         assert 'No projects found' in call_args
 
     async def test_new_task_start_flow(self, bot_handlers, api_client, mock_update, mock_context):
-        """Test new task starts creation flow"""
+        """Test new task starts creation flow with project selection"""
         api_client.get_user_by_telegram_id.return_value = {'id': 1}
         api_client.get_user_projects.return_value = [
             {'id': 1, 'name': 'Test Project'}
@@ -198,10 +198,10 @@ class TestNewTaskCommand:
 
         await bot_handlers.new_task_command(mock_update, mock_context)
 
-        assert mock_context.user_data['task_creation_step'] == 'awaiting_title'
+        assert mock_context.user_data['task_creation_step'] == 'awaiting_project'
         mock_update.message.reply_text.assert_called_once()
         call_args = mock_update.message.reply_text.call_args[0][0]
-        assert 'task title' in call_args
+        assert 'Select a project' in call_args
 
 
 @pytest.mark.asyncio
@@ -255,14 +255,14 @@ class TestHandleMessage:
     """Test message handling"""
 
     async def test_handle_message_task_title(self, bot_handlers, api_client, mock_update, mock_context):
-        """Test handling task title input"""
+        """Test handling task title input moves to description step"""
         mock_context.user_data['task_creation_step'] = 'awaiting_title'
         mock_update.message.text = 'New Task Title'
 
         await bot_handlers.handle_message(mock_update, mock_context)
 
         assert mock_context.user_data['task_title'] == 'New Task Title'
-        assert mock_context.user_data['task_creation_step'] == 'awaiting_priority'
+        assert mock_context.user_data['task_creation_step'] == 'awaiting_description'
         mock_update.message.reply_text.assert_called_once()
 
 
@@ -284,28 +284,23 @@ class TestHandleCallback:
         assert 'cancelled' in mock_update.callback_query.edit_message_text.call_args[0][0]
 
     async def test_handle_callback_priority_selection(self, bot_handlers, api_client, mock_update, mock_context):
-        """Test priority selection callback"""
+        """Test priority selection callback moves to due date step"""
         mock_update.callback_query = AsyncMock()
         mock_update.callback_query.data = 'priority_HIGH'
         mock_update.callback_query.answer = AsyncMock()
         mock_update.callback_query.edit_message_text = AsyncMock()
 
         mock_context.user_data = {
+            'task_creation_step': 'awaiting_priority',
             'task_title': 'Test Task',
+            'task_project_id': 1,
             'projects': [{'id': 1, 'name': 'Test Project'}]
-        }
-
-        api_client.create_task.return_value = {
-            'id': 1,
-            'title': 'Test Task',
-            'priority': 'HIGH',
-            'status': 'TODO',
-            'status_display': 'To Do',
-            'project': 'Test Project'
         }
 
         await bot_handlers.handle_callback(mock_update, mock_context)
 
-        api_client.create_task.assert_called_once()
+        assert mock_context.user_data['task_priority'] == 'HIGH'
+        assert mock_context.user_data['task_creation_step'] == 'awaiting_due_date'
         mock_update.callback_query.edit_message_text.assert_called_once()
-        assert 'Task Created' in mock_update.callback_query.edit_message_text.call_args[0][0]
+        call_args = mock_update.callback_query.edit_message_text.call_args[0][0]
+        assert 'due date' in call_args.lower()

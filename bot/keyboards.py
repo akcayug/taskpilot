@@ -70,6 +70,45 @@ def get_task_actions_keyboard(task_id, status):
     return InlineKeyboardMarkup(keyboard)
 
 
+def get_project_keyboard(projects):
+    """Create inline keyboard for project selection"""
+    keyboard = []
+    for project in projects:
+        keyboard.append([InlineKeyboardButton(
+            f"📁 {project['name']}",
+            callback_data=f"project_{project['id']}"
+        )])
+    keyboard.append([InlineKeyboardButton("❌ Cancel", callback_data="cancel")])
+    return InlineKeyboardMarkup(keyboard)
+
+
+def get_assignee_keyboard(members):
+    """Create inline keyboard for assignee selection"""
+    keyboard = []
+    for member in members:
+        label = member.get('full_name') or member.get('email', 'Unknown')
+        keyboard.append([InlineKeyboardButton(
+            f"👤 {label}",
+            callback_data=f"assignee_{member['id']}"
+        )])
+    keyboard.append([
+        InlineKeyboardButton("⏭ Atla", callback_data="skip_assignee"),
+        InlineKeyboardButton("❌ Cancel", callback_data="cancel")
+    ])
+    return InlineKeyboardMarkup(keyboard)
+
+
+def get_skip_keyboard(skip_callback):
+    """Create inline keyboard with skip and cancel buttons"""
+    keyboard = [
+        [
+            InlineKeyboardButton("⏭ Atla", callback_data=skip_callback),
+            InlineKeyboardButton("❌ Cancel", callback_data="cancel")
+        ]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
 def get_confirm_keyboard(action, task_id=None):
     """Create confirmation keyboard"""
     confirm_data = f"confirm_{action}"
