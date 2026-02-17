@@ -44,13 +44,13 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.taskpilot-web.rule=Host(`taskpilot.ugurakcay.com`)"
-      - "traefik.http.routers.taskpilot-web.entrypoints=websecure"
+      - "traefik.http.routers.taskpilot-web.entrypoints=https"
       - "traefik.http.routers.taskpilot-web.tls=true"
       - "traefik.http.routers.taskpilot-web.tls.certresolver=letsencrypt"
       - "traefik.http.routers.taskpilot-web.service=taskpilot-web"
       - "traefik.http.services.taskpilot-web.loadbalancer.server.port=8000"
       - "traefik.http.routers.taskpilot-web-http.rule=Host(`taskpilot.ugurakcay.com`)"
-      - "traefik.http.routers.taskpilot-web-http.entrypoints=web"
+      - "traefik.http.routers.taskpilot-web-http.entrypoints=http"
       - "traefik.http.routers.taskpilot-web-http.middlewares=https-redirect"
       - "traefik.http.middlewares.https-redirect.redirectscheme.scheme=https"
     depends_on:
