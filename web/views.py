@@ -59,8 +59,11 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         tenant = getattr(self.request, 'tenant', None)
 
         if tenant:
-            # Get task statistics
+            # Get task statistics - members see only their own tasks
             tasks = Task.objects.filter(tenant=tenant)
+            tenant_role = getattr(self.request, 'tenant_role', None)
+            if tenant_role != 'MANAGER':
+                tasks = tasks.filter(assignee=self.request.user)
             context['total_tasks'] = tasks.count()
             context['todo_count'] = tasks.filter(status=Task.Status.TODO).count()
             context['in_progress_count'] = tasks.filter(status=Task.Status.IN_PROGRESS).count()
@@ -100,10 +103,13 @@ class TaskListAPIView(LoginRequiredMixin, View):
         priority_filter = request.GET.get('priority', '')
         assignee_filter = request.GET.get('assignee', '')
 
-        # Base queryset
+        # Base queryset - members see only their own tasks
         queryset = Task.objects.filter(tenant=tenant).select_related(
             'project', 'assignee'
         )
+        tenant_role = getattr(request, 'tenant_role', None)
+        if tenant_role != 'MANAGER':
+            queryset = queryset.filter(assignee=request.user)
 
         # Apply filters
         if status_filter:
@@ -121,8 +127,11 @@ class TaskListAPIView(LoginRequiredMixin, View):
                 Q(project__name__icontains=search_value)
             )
 
-        # Total records
-        records_total = Task.objects.filter(tenant=tenant).count()
+        # Total records (respecting role-based access)
+        base_qs = Task.objects.filter(tenant=tenant)
+        if tenant_role != 'MANAGER':
+            base_qs = base_qs.filter(assignee=request.user)
+        records_total = base_qs.count()
         records_filtered = queryset.count()
 
         # Sorting
@@ -187,10 +196,13 @@ class ExportTasksView(LoginRequiredMixin, View):
         priority_filter = request.GET.get('priority', '')
         assignee_filter = request.GET.get('assignee', '')
 
-        # Base queryset
+        # Base queryset - members see only their own tasks
         queryset = Task.objects.filter(tenant=tenant).select_related(
             'project', 'assignee'
         )
+        tenant_role = getattr(request, 'tenant_role', None)
+        if tenant_role != 'MANAGER':
+            queryset = queryset.filter(assignee=request.user)
 
         # Apply filters
         if status_filter:
