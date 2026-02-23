@@ -107,6 +107,7 @@ class TenantSettings(models.Model):
         DE = 'de', _('German')
         FR = 'fr', _('French')
         ES = 'es', _('Spanish')
+        RU = 'ru', _('Russian')
 
     tenant = models.OneToOneField(Tenant, on_delete=models.CASCADE, related_name='settings')
     ai_enabled = models.BooleanField(default=False)

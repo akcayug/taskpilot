@@ -132,9 +132,6 @@ $(document).ready(function() {
         }
     });
 
-    // Handle form submission (demo only)
-    $('#taskForm').on('submit', function(e) {
-        e.preventDefault();
-        alert('This is a demo. In the actual implementation, this would save the task.');
-    });
+    // Note: Form submission is handled by the form's action attribute
+    // No need to prevent default - let the form submit normally
 });
