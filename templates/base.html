@@ -35,6 +35,14 @@
                             Dashboard
                         </a>
                     </li>
+                    {% if request.tenant_role == 'MANAGER' %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'settings' %}">
+                            <i data-lucide="settings" class="icon-sm"></i>
+                            Settings
+                        </a>
+                    </li>
+                    {% endif %}
                 </ul>
                 <div class="d-flex align-items-center text-white">
                     <i data-lucide="user" class="icon-sm me-2"></i>

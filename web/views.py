@@ -11,7 +11,9 @@ from django.shortcuts import render, redirect
 from django.http import JsonResponse, HttpResponse
 from django.db.models import Q
 from django.core.exceptions import ValidationError
+from django.contrib import messages
 from tasks.models import Task
+from core.models import TenantSettings
 
 
 class LoginView(View):
@@ -76,6 +78,79 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             context['done_count'] = 0
 
         return context
+
+
+class SettingsView(LoginRequiredMixin, View):
+    """Tenant settings view (manager-only)"""
+    login_url = 'login'
+    template_name = 'settings.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        # Check if user is a manager
+        tenant = getattr(request, 'tenant', None)
+        tenant_role = getattr(request, 'tenant_role', None)
+
+        if not tenant or tenant_role != 'MANAGER':
+            return HttpResponse('Permission denied. Only managers can access settings.', status=403)
+
+        return super().dispatch(request, *args, **kwargs)
+
+    def get(self, request):
+        tenant = getattr(request, 'tenant')
+
+        # Get or create settings for tenant
+        settings, created = TenantSettings.objects.get_or_create(tenant=tenant)
+
+        return render(request, self.template_name, {
+            'settings': settings,
+            'ai_modes': TenantSettings.AIMode.choices,
+            'languages': TenantSettings.Language.choices
+        })
+
+    def post(self, request):
+        tenant = getattr(request, 'tenant')
+
+        # Get or create settings for tenant
+        settings, created = TenantSettings.objects.get_or_create(tenant=tenant)
+
+        # Validate and update settings
+        try:
+            # AI enabled (checkbox)
+            settings.ai_enabled = request.POST.get('ai_enabled') == 'on'
+
+            # AI system prompt (max 500 chars)
+            ai_system_prompt = request.POST.get('ai_system_prompt', '').strip()
+            if not ai_system_prompt:
+                messages.error(request, 'AI system prompt is required')
+                return self.get(request)
+            if len(ai_system_prompt) > 500:
+                messages.error(request, 'AI system prompt must be 500 characters or less')
+                return self.get(request)
+            settings.ai_system_prompt = ai_system_prompt
+
+            # AI default mode
+            ai_default_mode = request.POST.get('ai_default_mode')
+            if ai_default_mode not in [choice[0] for choice in TenantSettings.AIMode.choices]:
+                messages.error(request, 'Invalid AI mode selected')
+                return self.get(request)
+            settings.ai_default_mode = ai_default_mode
+
+            # AI default language
+            ai_default_language = request.POST.get('ai_default_language')
+            if ai_default_language not in [choice[0] for choice in TenantSettings.Language.choices]:
+                messages.error(request, 'Invalid language selected')
+                return self.get(request)
+            settings.ai_default_language = ai_default_language
+
+            # Save settings
+            settings.save()
+
+            messages.success(request, 'Settings saved successfully')
+            return redirect('settings')
+
+        except Exception as e:
+            messages.error(request, f'Error saving settings: {str(e)}')
+            return self.get(request)
 
 
 class TaskListAPIView(LoginRequiredMixin, View):

@@ -92,3 +92,43 @@ class TenantMembership(models.Model):
 
     def __str__(self):
         return f"{self.user.email} - {self.tenant.name} ({self.role})"
+
+
+class TenantSettings(models.Model):
+    """Per-tenant settings for AI features and other configurations"""
+
+    class AIMode(models.TextChoices):
+        FIX = 'fix', _('Fix Language')
+        TRANSLATE = 'translate', _('Translate')
+
+    class Language(models.TextChoices):
+        EN = 'en', _('English')
+        TR = 'tr', _('Turkish')
+        DE = 'de', _('German')
+        FR = 'fr', _('French')
+        ES = 'es', _('Spanish')
+
+    tenant = models.OneToOneField(Tenant, on_delete=models.CASCADE, related_name='settings')
+    ai_enabled = models.BooleanField(default=False)
+    ai_system_prompt = models.TextField(
+        max_length=500,
+        default='You are a helpful assistant that improves task descriptions. Keep responses clear and concise.'
+    )
+    ai_default_mode = models.CharField(
+        max_length=20,
+        choices=AIMode.choices,
+        default=AIMode.FIX
+    )
+    ai_default_language = models.CharField(
+        max_length=5,
+        choices=Language.choices,
+        default=Language.EN
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'tenant_settings'
+
+    def __str__(self):
+        return f"Settings for {self.tenant.name}"

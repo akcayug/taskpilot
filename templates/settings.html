@@ -1,0 +1,136 @@
+{% extends 'base.html' %}
+
+{% block title %}Tenant Settings - TaskPilot{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width: 800px;">
+    <div class="card">
+        <div class="card-header">
+            <h4 class="mb-0">
+                <i data-lucide="settings" class="icon-sm"></i>
+                Tenant Settings
+            </h4>
+        </div>
+        <div class="card-body">
+            <!-- Success/Error Messages -->
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            <form method="post">
+                {% csrf_token %}
+
+                <!-- AI Enabled Toggle -->
+                <div class="mb-4">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="ai_enabled" name="ai_enabled"
+                               {% if settings.ai_enabled %}checked{% endif %}>
+                        <label class="form-check-label fw-bold" for="ai_enabled">
+                            Enable AI Features
+                        </label>
+                    </div>
+                    <small class="text-muted">
+                        Enable AI-powered task description improvements and translations
+                    </small>
+                </div>
+
+                <hr>
+
+                <!-- AI System Prompt -->
+                <div class="mb-4">
+                    <label for="ai_system_prompt" class="form-label fw-bold">
+                        AI System Prompt
+                        <span class="text-danger">*</span>
+                    </label>
+                    <textarea class="form-control" id="ai_system_prompt" name="ai_system_prompt"
+                              rows="4" maxlength="500" required>{{ settings.ai_system_prompt }}</textarea>
+                    <div class="form-text">
+                        Instructions for the AI when processing tasks (max 500 characters)
+                    </div>
+                    <div class="text-end">
+                        <small id="charCount" class="text-muted"></small>
+                    </div>
+                </div>
+
+                <!-- AI Default Mode -->
+                <div class="mb-4">
+                    <label for="ai_default_mode" class="form-label fw-bold">
+                        Default AI Mode
+                        <span class="text-danger">*</span>
+                    </label>
+                    <select class="form-select" id="ai_default_mode" name="ai_default_mode" required>
+                        {% for value, label in ai_modes %}
+                            <option value="{{ value }}" {% if settings.ai_default_mode == value %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                    <div class="form-text">
+                        Default mode for AI task improvements
+                    </div>
+                </div>
+
+                <!-- AI Default Language -->
+                <div class="mb-4">
+                    <label for="ai_default_language" class="form-label fw-bold">
+                        Default Target Language
+                        <span class="text-danger">*</span>
+                    </label>
+                    <select class="form-select" id="ai_default_language" name="ai_default_language" required>
+                        {% for value, label in languages %}
+                            <option value="{{ value }}" {% if settings.ai_default_language == value %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                    <div class="form-text">
+                        Default language for translations
+                    </div>
+                </div>
+
+                <hr>
+
+                <!-- Save Button -->
+                <div class="d-flex justify-content-between align-items-center">
+                    <a href="{% url 'dashboard' %}" class="btn btn-secondary">
+                        <i data-lucide="arrow-left" class="icon-sm"></i>
+                        Back to Dashboard
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        <i data-lucide="save" class="icon-sm"></i>
+                        Save Settings
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Character counter for system prompt
+    const textarea = document.getElementById('ai_system_prompt');
+    const charCount = document.getElementById('charCount');
+
+    function updateCharCount() {
+        const length = textarea.value.length;
+        charCount.textContent = `${length} / 500 characters`;
+        if (length > 450) {
+            charCount.classList.add('text-warning');
+        } else {
+            charCount.classList.remove('text-warning');
+        }
+        if (length >= 500) {
+            charCount.classList.remove('text-warning');
+            charCount.classList.add('text-danger');
+        }
+    }
+
+    textarea.addEventListener('input', updateCharCount);
+    updateCharCount(); // Initial count
+</script>
+{% endblock %}
