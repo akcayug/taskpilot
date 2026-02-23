@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load currency_filters %}
 
 {% block title %}Projects - TaskPilot{% endblock %}
 
@@ -117,16 +118,16 @@
                         <td>{{ project.task_count }}</td>
                         <td>
                             {% if project.contract_total_amount %}
-                            ${{ project.contract_total_amount|floatformat:0 }}
+                            {{ project.contract_total_amount|currency }}
                             {% else %}
                             <span class="text-muted">Not set</span>
                             {% endif %}
                         </td>
                         <td>
                             {% if project.contract_retention_total %}
-                            ${{ project.contract_retention_total|floatformat:0 }}
+                            {{ project.contract_retention_total|currency }}
                             {% else %}
-                            <span class="text-muted">-</span>
+                            <span class="text-muted">—</span>
                             {% endif %}
                         </td>
                         <td>
@@ -186,8 +187,8 @@
                 </div>
                 {% if project.contract_total_amount %}
                 <div class="project-stat">
-                    <i data-lucide="dollar-sign" class="icon-sm"></i>
-                    ${{ project.contract_total_amount|floatformat:0 }}
+                    <i data-lucide="ruble-sign" class="icon-sm"></i>
+                    {{ project.contract_total_amount|currency_short }}
                 </div>
                 {% endif %}
                 {% if project.latest_snapshot %}

@@ -100,7 +100,7 @@
         <!-- Financial Information -->
         <div class="form-section">
             <h5>
-                <i data-lucide="dollar-sign" class="icon-sm"></i>
+                <i data-lucide="ruble-sign" class="icon-sm"></i>
                 Financial Information
             </h5>
 
@@ -108,7 +108,7 @@
                 <div class="col-md-6 mb-3">
                     <label for="contract_total_amount" class="form-label fw-bold">Contract Total Amount</label>
                     <div class="input-group">
-                        <span class="input-group-text">$</span>
+                        <span class="input-group-text">₽</span>
                         <input type="number" class="form-control" id="contract_total_amount"
                                name="contract_total_amount" step="0.01" min="0"
                                value="{% if project and project.contract_total_amount %}{{ project.contract_total_amount }}{% endif %}"
@@ -120,7 +120,7 @@
                 <div class="col-md-6 mb-3">
                     <label for="contract_retention_total" class="form-label fw-bold">Total Retention Amount</label>
                     <div class="input-group">
-                        <span class="input-group-text">$</span>
+                        <span class="input-group-text">₽</span>
                         <input type="number" class="form-control" id="contract_retention_total"
                                name="contract_retention_total" step="0.01" min="0"
                                value="{% if project and project.contract_retention_total %}{{ project.contract_retention_total }}{% endif %}"
