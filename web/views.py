@@ -13,9 +13,10 @@ from django.db.models import Q
 from django.core.exceptions import ValidationError
 from django.contrib import messages
 from django.urls import reverse_lazy
-from tasks.models import Task, Project
+from tasks.models import Task, Project, ProjectFinancialSnapshot
 from core.models import TenantSettings, User
 from .llm_client import WebLLMClient
+from decimal import Decimal
 
 
 class LoginView(View):
@@ -329,6 +330,7 @@ class TaskListAPIView(LoginRequiredMixin, View):
                 'id': task.id,
                 'title': task.title,
                 'project': task.project.name,
+                'project_id': task.project.id,
                 'assignee': task.assignee.get_full_name() if task.assignee else 'Unassigned',
                 'assignee_id': task.assignee_id,
                 'due_date': task.due_date.strftime('%Y-%m-%d') if task.due_date else '',
@@ -938,3 +940,113 @@ class TelegramSettingsAPIView(View):
             'ai_default_mode': settings.ai_default_mode,
             'ai_default_language': settings.ai_default_language
         })
+
+
+class ProjectDetailView(LoginRequiredMixin, TemplateView):
+    """Project detail view with financial KPIs and snapshot history"""
+    template_name = 'project_detail.html'
+    login_url = 'login'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        # Get tenant from request
+        tenant = getattr(self.request, 'tenant', None)
+        project_id = kwargs.get('project_id')
+
+        # Get project with tenant isolation
+        project = get_object_or_404(Project, id=project_id, tenant=tenant)
+
+        # Get financial KPIs
+        kpis = project.get_financial_kpis()
+
+        # Get snapshot history - members see only their own, managers see all
+        snapshots = project.snapshots.all()
+        tenant_role = getattr(self.request, 'tenant_role', None)
+
+        context['project'] = project
+        context['kpis'] = kpis
+        context['snapshots'] = snapshots
+        context['is_manager'] = tenant_role == 'MANAGER'
+
+        return context
+
+
+class SnapshotCreateView(LoginRequiredMixin, View):
+    """Create financial snapshot (manager-only)"""
+    login_url = 'login'
+
+    def dispatch(self, request, *args, **kwargs):
+        # Check if user is a manager
+        tenant = getattr(request, 'tenant', None)
+        tenant_role = getattr(request, 'tenant_role', None)
+
+        if not tenant or tenant_role != 'MANAGER':
+            return HttpResponse('Permission denied. Only managers can create financial snapshots.', status=403)
+
+        return super().dispatch(request, *args, **kwargs)
+
+    def post(self, request, project_id):
+        tenant = getattr(request, 'tenant')
+
+        # Get project with tenant isolation
+        project = get_object_or_404(Project, id=project_id, tenant=tenant)
+
+        try:
+            # Get form data
+            total_completed_work = Decimal(request.POST.get('total_completed_work', '0'))
+            total_paid_amount = Decimal(request.POST.get('total_paid_amount', '0'))
+            total_retention_earned = Decimal(request.POST.get('total_retention_earned', '0'))
+            notes = request.POST.get('notes', '').strip()
+
+            # Validation: no negative values
+            if total_completed_work < 0 or total_paid_amount < 0 or total_retention_earned < 0:
+                messages.error(request, 'Values cannot be negative')
+                return redirect('project_detail', project_id=project_id)
+
+            # Validation: completed work cannot exceed contract total
+            if total_completed_work > project.contract_total_amount:
+                messages.error(request, 'Completed work cannot exceed contract total amount')
+                return redirect('project_detail', project_id=project_id)
+
+            # Validation: retention earned cannot exceed retention total
+            if total_retention_earned > project.contract_retention_total:
+                messages.error(request, 'Retention earned cannot exceed contract retention total')
+                return redirect('project_detail', project_id=project_id)
+
+            # Create snapshot
+            snapshot = ProjectFinancialSnapshot.objects.create(
+                project=project,
+                total_completed_work=total_completed_work,
+                total_paid_amount=total_paid_amount,
+                total_retention_earned=total_retention_earned,
+                notes=notes,
+                created_by=request.user
+            )
+
+            # Create audit log
+            from audit.models import AuditLog
+            AuditLog.objects.create(
+                user=request.user,
+                action='CREATE',
+                resource_type='ProjectFinancialSnapshot',
+                resource_id=snapshot.id,
+                changes={
+                    'project_id': project.id,
+                    'project_name': project.name,
+                    'total_completed_work': str(total_completed_work),
+                    'total_paid_amount': str(total_paid_amount),
+                    'total_retention_earned': str(total_retention_earned),
+                    'notes': notes
+                }
+            )
+
+            messages.success(request, 'Financial snapshot created successfully')
+            return redirect('project_detail', project_id=project_id)
+
+        except (ValueError, TypeError) as e:
+            messages.error(request, f'Invalid input: {str(e)}')
+            return redirect('project_detail', project_id=project_id)
+        except Exception as e:
+            messages.error(request, f'Error creating snapshot: {str(e)}')
+            return redirect('project_detail', project_id=project_id)

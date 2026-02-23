@@ -232,6 +232,44 @@
     height: 14px;
 }
 
+/* KPI Cards */
+.kpi-card {
+    border-left: 4px solid var(--primary);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.kpi-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.15) !important;
+}
+
+.kpi-card h3 {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--primary);
+}
+
+.kpi-card h6 {
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.kpi-card small {
+    font-size: 0.75rem;
+}
+
+/* Progress bars for KPIs */
+.kpi-card .progress {
+    border-radius: 0.5rem;
+    background-color: #e9ecef;
+}
+
+.kpi-card .progress-bar {
+    border-radius: 0.5rem;
+    transition: width 0.6s ease;
+}
+
 /* Responsive adjustments */
 @media (max-width: 767.98px) {
     .container-fluid {
@@ -251,5 +289,10 @@
     .row.mb-4 > .col-md-3 {
         flex: 0 0 calc(50% - 0.375rem);
         max-width: calc(50% - 0.375rem);
+    }
+
+    /* Stack KPI cards on mobile */
+    .kpi-card h3 {
+        font-size: 1.5rem;
     }
 }

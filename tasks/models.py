@@ -9,6 +9,21 @@ class Project(models.Model):
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='projects')
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
+
+    # Financial fields (contract)
+    contract_total_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+        help_text="Total contract amount"
+    )
+    contract_retention_total = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+        help_text="Total retention amount withheld from contract"
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -19,6 +34,49 @@ class Project(models.Model):
 
     def __str__(self):
         return f"{self.tenant.name} - {self.name}"
+
+    def get_latest_snapshot(self):
+        """Get the most recent financial snapshot"""
+        return self.snapshots.order_by('-created_at').first()
+
+    def get_financial_kpis(self):
+        """Calculate financial KPIs based on latest snapshot"""
+        snapshot = self.get_latest_snapshot()
+
+        if not snapshot:
+            return {
+                'completion_percentage': 0,
+                'remaining_work': float(self.contract_total_amount),
+                'paid_percentage': 0,
+                'remaining_payment': float(self.contract_total_amount - self.contract_retention_total),
+                'remaining_retention': float(self.contract_retention_total),
+                'has_data': False
+            }
+
+        # Avoid division by zero
+        completion_percentage = 0
+        if self.contract_total_amount > 0:
+            completion_percentage = (float(snapshot.total_completed_work) / float(self.contract_total_amount)) * 100
+
+        remaining_work = float(self.contract_total_amount) - float(snapshot.total_completed_work)
+
+        # Payment calculations (excluding retention)
+        payment_base = float(self.contract_total_amount - self.contract_retention_total)
+        paid_percentage = 0
+        if payment_base > 0:
+            paid_percentage = (float(snapshot.total_paid_amount) / payment_base) * 100
+
+        remaining_payment = payment_base - float(snapshot.total_paid_amount)
+        remaining_retention = float(self.contract_retention_total) - float(snapshot.total_retention_earned)
+
+        return {
+            'completion_percentage': round(completion_percentage, 2),
+            'remaining_work': round(remaining_work, 2),
+            'paid_percentage': round(paid_percentage, 2),
+            'remaining_payment': round(remaining_payment, 2),
+            'remaining_retention': round(remaining_retention, 2),
+            'has_data': True
+        }
 
 
 class Task(models.Model):
@@ -77,3 +135,47 @@ class Task(models.Model):
         if self.project:
             self.tenant = self.project.tenant
         super().save(*args, **kwargs)
+
+
+class ProjectFinancialSnapshot(models.Model):
+    """Financial snapshot for project tracking"""
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='snapshots')
+
+    # User input values
+    total_completed_work = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+        help_text="Total value of completed work"
+    )
+    total_paid_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+        help_text="Total amount paid (excluding retention)"
+    )
+    total_retention_earned = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+        help_text="Total retention earned/released"
+    )
+
+    notes = models.TextField(blank=True, help_text="Optional notes about this snapshot")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='financial_snapshots'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'project_financial_snapshots'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['project', '-created_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.project.name} - Snapshot {self.created_at.strftime('%Y-%m-%d')}"

@@ -16,7 +16,9 @@ from .views import (
     TelegramTaskStatusAPIView,
     TelegramMembersAPIView,
     TelegramProjectsAPIView,
-    TelegramSettingsAPIView
+    TelegramSettingsAPIView,
+    ProjectDetailView,
+    SnapshotCreateView
 )
 
 urlpatterns = [
@@ -39,4 +41,8 @@ urlpatterns = [
     path('api/telegram/members', TelegramMembersAPIView.as_view(), name='telegram_members_api'),
     path('api/telegram/projects', TelegramProjectsAPIView.as_view(), name='telegram_projects_api'),
     path('api/telegram/settings', TelegramSettingsAPIView.as_view(), name='telegram_settings_api'),
+
+    # Project financial views
+    path('projects/<int:project_id>/', ProjectDetailView.as_view(), name='project_detail'),
+    path('projects/<int:project_id>/snapshots/create/', SnapshotCreateView.as_view(), name='snapshot_create'),
 ]

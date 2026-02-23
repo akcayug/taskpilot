@@ -78,7 +78,7 @@ $(document).ready(function() {
         if (field === 'title') {
             $cell.html('<strong>' + escapeHtml(row.title) + '</strong>');
         } else if (field === 'project') {
-            $cell.html(escapeHtml(row.project));
+            $cell.html('<a href="/projects/' + row.project_id + '/" class="text-decoration-none">' + escapeHtml(row.project) + '</a>');
         } else if (field === 'assignee') {
             $cell.html(escapeHtml(row.assignee));
         } else if (field === 'status') {
@@ -248,7 +248,12 @@ $(document).ready(function() {
             },
             columns: [
                 // Project → Assignee → Title → Status → Due → Priority → Updated → Actions
-                { data: 'project' },
+                {
+                    data: 'project',
+                    render: function(data, type, row) {
+                        return '<a href="/projects/' + row.project_id + '/" class="text-decoration-none">' + escapeHtml(data) + '</a>';
+                    }
+                },
                 { data: 'assignee' },
                 {
                     data: 'title',
@@ -356,7 +361,7 @@ $(document).ready(function() {
                 <div class="task-card-body">
                     <div class="task-card-info">
                         <i data-lucide="folder"></i>
-                        <span>${escapeHtml(task.project)}</span>
+                        <a href="/projects/${task.project_id}/" class="text-decoration-none">${escapeHtml(task.project)}</a>
                     </div>
                     <div class="task-card-info">
                         <i data-lucide="user"></i>
