@@ -2,6 +2,7 @@ from django.urls import path
 from .views import (
     LoginView,
     LogoutView,
+    DebugTenantView,
     DashboardView,
     SettingsView,
     TaskFormView,
@@ -26,6 +27,7 @@ urlpatterns = [
     path('', DashboardView.as_view(), name='dashboard'),
     path('login/', LoginView.as_view(), name='login'),
     path('logout/', LogoutView.as_view(), name='logout'),
+    path('debug/tenant/', DebugTenantView.as_view(), name='debug_tenant'),
     path('settings/', SettingsView.as_view(), name='settings'),
 
     # Task form (create/edit)

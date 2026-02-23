@@ -8,7 +8,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views import View
 from django.views.generic import TemplateView, CreateView, UpdateView
 from django.shortcuts import render, redirect, get_object_or_404
-from django.http import JsonResponse, HttpResponse
+from django.http import JsonResponse, HttpResponse, HttpResponseForbidden
 from django.db.models import Q
 from django.core.exceptions import ValidationError
 from django.contrib import messages
@@ -51,6 +51,41 @@ class LogoutView(View):
     def post(self, request):
         logout(request)
         return redirect('login')
+
+
+class DebugTenantView(LoginRequiredMixin, View):
+    """Debug view to check tenant and role"""
+    login_url = 'login'
+
+    def get(self, request):
+        from core.models import TenantMembership
+
+        tenant = getattr(request, 'tenant', None)
+        tenant_role = getattr(request, 'tenant_role', None)
+
+        # Get membership directly
+        membership = TenantMembership.objects.filter(user=request.user).first()
+
+        debug_info = {
+            'user_email': request.user.email,
+            'user_is_authenticated': request.user.is_authenticated,
+            'request_tenant': str(tenant) if tenant else 'None',
+            'request_tenant_role': str(tenant_role) if tenant_role else 'None',
+            'tenant_role_type': str(type(tenant_role)),
+            'db_membership_exists': membership is not None,
+        }
+
+        if membership:
+            debug_info.update({
+                'db_tenant_name': membership.tenant.name,
+                'db_tenant_active': membership.tenant.is_active,
+                'db_role': membership.role,
+                'db_role_type': str(type(membership.role)),
+                'role_comparison_MANAGER': membership.role == 'MANAGER',
+                'role_comparison_MEMBER': membership.role == 'MEMBER',
+            })
+
+        return JsonResponse(debug_info, json_dumps_params={'indent': 2})
 
 
 class DashboardView(LoginRequiredMixin, TemplateView):
