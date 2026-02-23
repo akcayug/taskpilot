@@ -1172,6 +1172,13 @@ class ProjectListView(LoginRequiredMixin, TemplateView):
     template_name = 'project_list.html'
     login_url = 'login'
 
+    def get(self, request, *args, **kwargs):
+        # Redirect superusers to admin
+        if request.user.is_superuser:
+            messages.warning(request, "Superusers should use /admin/ to manage projects")
+            return redirect('/admin/tasks/project/')
+        return super().get(request, *args, **kwargs)
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         tenant = getattr(self.request, 'tenant', None)
@@ -1179,16 +1186,18 @@ class ProjectListView(LoginRequiredMixin, TemplateView):
         if tenant:
             # Get all projects with task counts and latest snapshots
             projects = Project.objects.filter(tenant=tenant).prefetch_related(
-                'financial_snapshots'
+                'snapshots'
             ).annotate(
                 task_count=models.Count('tasks')
             ).order_by('name')
 
             # Add latest snapshot to each project
             for project in projects:
-                project.latest_snapshot = project.financial_snapshots.order_by('-created_at').first()
+                project.latest_snapshot = project.snapshots.order_by('-created_at').first()
 
             context['projects'] = projects
+        else:
+            context['projects'] = []
 
         return context
 

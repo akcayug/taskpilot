@@ -230,15 +230,19 @@
 {% block extra_js %}
 <script>
     $(document).ready(function() {
-        // Initialize DataTables for desktop view
-        if (window.innerWidth >= 768) {
-            $('#projectsTable').DataTable({
-                order: [[0, 'asc']],
-                pageLength: 25,
-                language: {
-                    emptyTable: "No projects found"
-                }
-            });
+        // Initialize DataTables for desktop view only if there are projects
+        if (window.innerWidth >= 768 && $('#projectsTable tbody tr').length > 0) {
+            // Check if there's actual data (not just empty message)
+            const hasData = !$('#projectsTable tbody tr td[colspan]').length;
+            if (hasData) {
+                $('#projectsTable').DataTable({
+                    order: [[0, 'asc']],
+                    pageLength: 25,
+                    language: {
+                        emptyTable: "No projects found"
+                    }
+                });
+            }
         }
     });
 </script>
