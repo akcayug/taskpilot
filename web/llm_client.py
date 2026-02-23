@@ -47,33 +47,16 @@ class WebLLMClient:
             }
 
         try:
-            # Build user prompt based on mode
-            if mode == 'translate':
-                language_names = {
-                    'en': 'English',
-                    'tr': 'Turkish',
-                    'de': 'German',
-                    'fr': 'French',
-                    'es': 'Spanish',
-                    'ru': 'Russian'
-                }
-                target_lang_name = language_names.get(target_language, 'English')
-                user_prompt = (
-                    f"Translate the following text to {target_lang_name}. "
-                    f"Keep it clear and concise:\n\n{text}"
-                )
-            else:  # mode == 'fix'
-                user_prompt = (
-                    f"Improve the following text. "
-                    f"Fix grammar, make it clear and professional:\n\n{text}"
-                )
+            # Use system prompt directly without additional instructions
+            # The system prompt should contain all necessary instructions
+            # for how to handle the text (translate, fix, etc.)
 
             # Call OpenAI API (v1.x format)
             response = self.client.chat.completions.create(
-                model="gpt-4",
+                model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
+                    {"role": "user", "content": text}  # Just the raw text
                 ],
                 temperature=0.7,
                 max_tokens=300
