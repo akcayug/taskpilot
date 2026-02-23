@@ -4,6 +4,7 @@ from .views import (
     LogoutView,
     DashboardView,
     TaskListAPIView,
+    TaskInlineUpdateAPIView,
     ExportTasksView,
     TelegramLinkAPIView,
     TelegramUserAPIView,
@@ -19,6 +20,7 @@ urlpatterns = [
     path('login/', LoginView.as_view(), name='login'),
     path('logout/', LogoutView.as_view(), name='logout'),
     path('api/tasks/', TaskListAPIView.as_view(), name='api_tasks'),
+    path('api/tasks/<int:task_id>/', TaskInlineUpdateAPIView.as_view(), name='task_inline_update'),
     path('export/tasks/', ExportTasksView.as_view(), name='export_tasks'),
 
     # Telegram Bot API endpoints

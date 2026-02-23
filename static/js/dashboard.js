@@ -1,5 +1,6 @@
 $(document).ready(function() {
     const isMobile = () => window.innerWidth < 768;
+    const isManager = window.userRole === 'MANAGER';
 
     let table = null;
     let mobileData = {
@@ -7,9 +8,234 @@ $(document).ready(function() {
         pageSize: 10,
         totalRecords: 0
     };
+    let tenantMembers = []; // Cache for tenant members (assignee dropdown)
+    let editingRow = null; // Track currently editing row
+
+    // Fetch tenant members for assignee dropdown (managers only)
+    if (isManager) {
+        $.ajax({
+            url: '/api/telegram/members',
+            method: 'GET',
+            success: function(response) {
+                tenantMembers = response.members || [];
+            }
+        });
+    }
+
+    function getCsrfToken() {
+        const token = document.querySelector('[name=csrfmiddlewaretoken]');
+        return token ? token.value : '';
+    }
+
+    // Setup CSRF for AJAX requests
+    $.ajaxSetup({
+        beforeSend: function(xhr, settings) {
+            if (!/^(GET|HEAD|OPTIONS|TRACE)$/i.test(settings.type) && !this.crossDomain) {
+                xhr.setRequestHeader("X-CSRFToken", getCsrfToken());
+            }
+        }
+    });
+
+    function makeEditable(cell, field, row) {
+        const value = row[field + '_value'] || row[field] || '';
+        const $cell = $(cell);
+
+        if (field === 'title') {
+            $cell.html(`<input type="text" class="form-control form-control-sm" value="${escapeHtml(value)}" maxlength="100">`);
+        } else if (field === 'status') {
+            const statuses = ['TODO', 'IN_PROGRESS', 'DONE', 'ARCHIVED'];
+            const statusLabels = {
+                'TODO': 'To Do',
+                'IN_PROGRESS': 'In Progress',
+                'DONE': 'Done',
+                'ARCHIVED': 'Archived'
+            };
+            let options = statuses.map(s =>
+                `<option value="${s}" ${s === value ? 'selected' : ''}>${statusLabels[s]}</option>`
+            ).join('');
+            $cell.html(`<select class="form-select form-select-sm">${options}</select>`);
+        } else if (field === 'priority') {
+            const priorities = ['HIGH', 'MEDIUM', 'LOW'];
+            const priorityLabels = {'HIGH': 'High', 'MEDIUM': 'Medium', 'LOW': 'Low'};
+            let options = priorities.map(p =>
+                `<option value="${p}" ${p === value ? 'selected' : ''}>${priorityLabels[p]}</option>`
+            ).join('');
+            $cell.html(`<select class="form-select form-select-sm">${options}</select>`);
+        } else if (field === 'due_date') {
+            $cell.html(`<input type="date" class="form-control form-control-sm" value="${value}">`);
+        } else if (field === 'assignee' && isManager) {
+            let options = '<option value="">Unassigned</option>';
+            options += tenantMembers.map(m =>
+                `<option value="${m.id}" ${m.id === row.assignee_id ? 'selected' : ''}>${escapeHtml(m.full_name)}</option>`
+            ).join('');
+            $cell.html(`<select class="form-select form-select-sm">${options}</select>`);
+        }
+    }
+
+    function restoreDisplay(cell, field, row) {
+        const $cell = $(cell);
+
+        if (field === 'title') {
+            $cell.html('<strong>' + escapeHtml(row.title) + '</strong>');
+        } else if (field === 'project') {
+            $cell.html(escapeHtml(row.project));
+        } else if (field === 'assignee') {
+            $cell.html(escapeHtml(row.assignee));
+        } else if (field === 'status') {
+            $cell.html('<span class="badge badge-status-' + row.status_value + '">' + escapeHtml(row.status) + '</span>');
+        } else if (field === 'priority') {
+            $cell.html('<span class="badge badge-priority-' + row.priority_value + '">' + escapeHtml(row.priority) + '</span>');
+        } else if (field === 'due_date') {
+            const display = row.due_date || '<span class="text-muted">No due date</span>';
+            $cell.html(display);
+        } else if (field === 'updated_at') {
+            $cell.html(escapeHtml(row.updated_at || row.created_at));
+        }
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function enterEditMode($row, rowData) {
+        if (editingRow) {
+            alert('Please save or cancel the current edit first');
+            return;
+        }
+
+        editingRow = { $row, rowData };
+        const cells = $row.find('td');
+
+        // Make cells editable based on role
+        makeEditable(cells[2], 'title', rowData); // Title
+        makeEditable(cells[3], 'status', rowData); // Status
+        makeEditable(cells[4], 'due_date', rowData); // Due date
+        makeEditable(cells[5], 'priority', rowData); // Priority
+        if (isManager) {
+            makeEditable(cells[1], 'assignee', rowData); // Assignee (manager only)
+        }
+
+        // Change actions to save/cancel
+        const $actionsCell = $(cells[7]);
+        $actionsCell.html(`
+            <button class="btn btn-sm btn-success save-btn" title="Save">
+                <i data-lucide="check" class="icon-sm"></i>
+            </button>
+            <button class="btn btn-sm btn-secondary cancel-btn" title="Cancel">
+                <i data-lucide="x" class="icon-sm"></i>
+            </button>
+        `);
+        lucide.createIcons();
+    }
+
+    function exitEditMode(restore = true) {
+        if (!editingRow) return;
+
+        const { $row, rowData } = editingRow;
+        const cells = $row.find('td');
+
+        if (restore) {
+            // Restore original values
+            restoreDisplay(cells[1], 'assignee', rowData);
+            restoreDisplay(cells[2], 'title', rowData);
+            restoreDisplay(cells[3], 'status', rowData);
+            restoreDisplay(cells[4], 'due_date', rowData);
+            restoreDisplay(cells[5], 'priority', rowData);
+        }
+
+        // Restore actions
+        const $actionsCell = $(cells[7]);
+        $actionsCell.html(`
+            <button class="btn btn-sm btn-primary edit-btn" title="Edit">
+                <i data-lucide="edit-2" class="icon-sm"></i>
+            </button>
+        `);
+        lucide.createIcons();
+
+        editingRow = null;
+    }
+
+    function saveTask() {
+        if (!editingRow) return;
+
+        const { $row, rowData } = editingRow;
+        const cells = $row.find('td');
+
+        // Collect updated values
+        const updates = {
+            updated_at: rowData.updated_at || rowData.created_at
+        };
+
+        const $titleInput = $(cells[2]).find('input');
+        if ($titleInput.length) updates.title = $titleInput.val();
+
+        const $statusSelect = $(cells[3]).find('select');
+        if ($statusSelect.length) updates.status = $statusSelect.val();
+
+        const $dueDateInput = $(cells[4]).find('input');
+        if ($dueDateInput.length) updates.due_date = $dueDateInput.val() || null;
+
+        const $prioritySelect = $(cells[5]).find('select');
+        if ($prioritySelect.length) updates.priority = $prioritySelect.val();
+
+        if (isManager) {
+            const $assigneeSelect = $(cells[1]).find('select');
+            if ($assigneeSelect.length) {
+                updates.assignee_id = $assigneeSelect.val() || null;
+            }
+        }
+
+        // Show loading state
+        const $actionsCell = $(cells[7]);
+        $actionsCell.html('<span class="spinner-border spinner-border-sm"></span>');
+
+        // Send PATCH request
+        $.ajax({
+            url: `/api/tasks/${rowData.id}/`,
+            method: 'PATCH',
+            contentType: 'application/json',
+            headers: {
+                'X-CSRFToken': getCsrfToken()
+            },
+            data: JSON.stringify(updates),
+            success: function(response) {
+                // Update row data with response
+                Object.assign(rowData, response);
+
+                // Update cells with new values
+                $(cells[1]).html(escapeHtml(response.assignee));
+                $(cells[2]).html('<strong>' + escapeHtml(response.title) + '</strong>');
+                $(cells[3]).html('<span class="badge badge-status-' + response.status_value + '">' + escapeHtml(response.status) + '</span>');
+                $(cells[4]).html(response.due_date || '<span class="text-muted">No due date</span>');
+                $(cells[5]).html('<span class="badge badge-priority-' + response.priority_value + '">' + escapeHtml(response.priority) + '</span>');
+                $(cells[6]).html(escapeHtml(response.updated_at));
+
+                exitEditMode(false);
+
+                // Show success message briefly
+                $actionsCell.html('<span class="text-success"><i data-lucide="check"></i></span>');
+                lucide.createIcons();
+                setTimeout(function() {
+                    $actionsCell.html(`
+                        <button class="btn btn-sm btn-primary edit-btn" title="Edit">
+                            <i data-lucide="edit-2" class="icon-sm"></i>
+                        </button>
+                    `);
+                    lucide.createIcons();
+                }, 1000);
+            },
+            error: function(xhr) {
+                exitEditMode(true);
+                const error = xhr.responseJSON?.error || 'Failed to update task';
+                alert('Error: ' + error);
+            }
+        });
+    }
 
     function initDesktopView() {
-        // Initialize DataTable for desktop
+        // Initialize DataTable for desktop with new column order
         table = $('#tasksTable').DataTable({
             processing: true,
             serverSide: true,
@@ -21,36 +247,51 @@ $(document).ready(function() {
                 }
             },
             columns: [
-                {
-                    data: 'title',
-                    render: function(data, type, row) {
-                        return '<strong>' + data + '</strong>';
-                    }
-                },
+                // Project → Assignee → Title → Status → Due → Priority → Updated → Actions
                 { data: 'project' },
                 { data: 'assignee' },
                 {
-                    data: 'due_date',
+                    data: 'title',
                     render: function(data, type, row) {
-                        if (!data) return '<span class="text-muted">No due date</span>';
-                        return data;
-                    }
-                },
-                {
-                    data: 'priority',
-                    render: function(data, type, row) {
-                        return '<span class="badge badge-priority-' + row.priority_value + '">' + data + '</span>';
+                        return '<strong>' + escapeHtml(data) + '</strong>';
                     }
                 },
                 {
                     data: 'status',
                     render: function(data, type, row) {
-                        return '<span class="badge badge-status-' + row.status_value + '">' + data + '</span>';
+                        return '<span class="badge badge-status-' + row.status_value + '">' + escapeHtml(data) + '</span>';
                     }
                 },
-                { data: 'created_at' }
+                {
+                    data: 'due_date',
+                    render: function(data, type, row) {
+                        if (!data) return '<span class="text-muted">No due date</span>';
+                        return escapeHtml(data);
+                    }
+                },
+                {
+                    data: 'priority',
+                    render: function(data, type, row) {
+                        return '<span class="badge badge-priority-' + row.priority_value + '">' + escapeHtml(data) + '</span>';
+                    }
+                },
+                {
+                    data: 'updated_at',
+                    render: function(data, type, row) {
+                        return escapeHtml(data || row.created_at);
+                    }
+                },
+                {
+                    data: null,
+                    orderable: false,
+                    render: function(data, type, row) {
+                        return `<button class="btn btn-sm btn-primary edit-btn" title="Edit">
+                                    <i data-lucide="edit-2" class="icon-sm"></i>
+                                </button>`;
+                    }
+                }
             ],
-            order: [[6, 'desc']], // Sort by created_at descending
+            order: [[6, 'desc']], // Sort by updated_at descending
             pageLength: 25,
             language: {
                 emptyTable: "No tasks found",
@@ -71,6 +312,23 @@ $(document).ready(function() {
             }
         });
 
+        // Edit button click handler (delegated)
+        $('#tasksTable tbody').on('click', '.edit-btn', function() {
+            const $row = $(this).closest('tr');
+            const rowData = table.row($row).data();
+            enterEditMode($row, rowData);
+        });
+
+        // Save button click handler (delegated)
+        $('#tasksTable tbody').on('click', '.save-btn', function() {
+            saveTask();
+        });
+
+        // Cancel button click handler (delegated)
+        $('#tasksTable tbody').on('click', '.cancel-btn', function() {
+            exitEditMode(true);
+        });
+
         // Filter by status
         $('#statusFilter').on('change', function() {
             table.ajax.reload();
@@ -89,28 +347,28 @@ $(document).ready(function() {
         return `
             <div class="task-card ${priorityClass}" data-task-id="${task.id}">
                 <div class="task-card-header">
-                    <h6 class="task-card-title">${task.title}</h6>
+                    <h6 class="task-card-title">${escapeHtml(task.title)}</h6>
                     <div class="task-card-badges">
-                        <span class="badge badge-status-${task.status_value}">${task.status}</span>
-                        <span class="badge badge-priority-${task.priority_value}">${task.priority}</span>
+                        <span class="badge badge-status-${task.status_value}">${escapeHtml(task.status)}</span>
+                        <span class="badge badge-priority-${task.priority_value}">${escapeHtml(task.priority)}</span>
                     </div>
                 </div>
                 <div class="task-card-body">
                     <div class="task-card-info">
                         <i data-lucide="folder"></i>
-                        <span>${task.project}</span>
+                        <span>${escapeHtml(task.project)}</span>
                     </div>
                     <div class="task-card-info">
                         <i data-lucide="user"></i>
-                        <span>${task.assignee}</span>
+                        <span>${escapeHtml(task.assignee)}</span>
                     </div>
                     <div class="task-card-info">
                         <i data-lucide="calendar"></i>
-                        <span>${dueDate}</span>
+                        <span>${escapeHtml(dueDate)}</span>
                     </div>
                 </div>
                 <div class="task-card-footer">
-                    <span>Created ${task.created_at}</span>
+                    <span>Updated ${escapeHtml(task.updated_at || task.created_at)}</span>
                 </div>
             </div>
         `;

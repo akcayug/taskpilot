@@ -10,6 +10,7 @@ from django.views.generic import TemplateView
 from django.shortcuts import render, redirect
 from django.http import JsonResponse, HttpResponse
 from django.db.models import Q
+from django.core.exceptions import ValidationError
 from tasks.models import Task
 
 
@@ -165,12 +166,14 @@ class TaskListAPIView(LoginRequiredMixin, View):
                 'title': task.title,
                 'project': task.project.name,
                 'assignee': task.assignee.get_full_name() if task.assignee else 'Unassigned',
+                'assignee_id': task.assignee_id,
                 'due_date': task.due_date.strftime('%Y-%m-%d') if task.due_date else '',
                 'priority': task.get_priority_display(),
                 'priority_value': task.priority,
                 'status': task.get_status_display(),
                 'status_value': task.status,
-                'created_at': task.created_at.strftime('%Y-%m-%d %H:%M')
+                'created_at': task.created_at.strftime('%Y-%m-%d %H:%M'),
+                'updated_at': task.updated_at.strftime('%Y-%m-%d %H:%M')
             })
 
         return JsonResponse({
@@ -179,6 +182,167 @@ class TaskListAPIView(LoginRequiredMixin, View):
             'recordsFiltered': records_filtered,
             'data': data
         })
+
+
+class TaskInlineUpdateAPIView(LoginRequiredMixin, View):
+    """API endpoint for inline task editing"""
+    login_url = 'login'
+
+    def patch(self, request, task_id):
+        try:
+            data = json.loads(request.body)
+            tenant = getattr(request, 'tenant', None)
+            tenant_role = getattr(request, 'tenant_role', None)
+
+            if not tenant:
+                return JsonResponse({'error': 'No tenant found'}, status=403)
+
+            # Get task
+            try:
+                task = Task.objects.select_related('project', 'assignee').get(
+                    id=task_id,
+                    tenant=tenant
+                )
+            except Task.DoesNotExist:
+                return JsonResponse({'error': 'Task not found'}, status=404)
+
+            # Permission check: members can only edit their own assigned tasks
+            if tenant_role != 'MANAGER' and task.assignee != request.user:
+                return JsonResponse({'error': 'Permission denied'}, status=403)
+
+            # Conflict detection: check updated_at timestamp
+            client_updated_at = data.get('updated_at')
+            if client_updated_at:
+                from datetime import datetime
+                try:
+                    client_dt = datetime.fromisoformat(client_updated_at.replace('Z', '+00:00'))
+                    if task.updated_at.replace(tzinfo=None) > client_dt.replace(tzinfo=None):
+                        return JsonResponse({
+                            'error': 'Task has been modified by another user. Please refresh and try again.'
+                        }, status=409)
+                except (ValueError, AttributeError):
+                    pass
+
+            # Store old values for audit log
+            old_values = {
+                'title': task.title,
+                'status': task.status,
+                'priority': task.priority,
+                'assignee_id': task.assignee_id,
+                'due_date': str(task.due_date) if task.due_date else None,
+            }
+
+            # Update allowed fields
+            updated_fields = []
+
+            # Title (max 100 chars, all users can edit)
+            if 'title' in data:
+                new_title = data['title'][:100]  # Enforce max length
+                if task.title != new_title:
+                    task.title = new_title
+                    updated_fields.append('title')
+
+            # Status (validate transitions)
+            if 'status' in data:
+                from tasks.services import TaskService
+                new_status = data['status']
+                if task.status != new_status:
+                    try:
+                        TaskService.validate_status_transition(task, new_status)
+                        task.status = new_status
+                        updated_fields.append('status')
+                    except ValidationError as e:
+                        return JsonResponse({'error': str(e)}, status=400)
+
+            # Priority
+            if 'priority' in data:
+                new_priority = data['priority']
+                if new_priority in [c[0] for c in Task.Priority.choices]:
+                    if task.priority != new_priority:
+                        task.priority = new_priority
+                        updated_fields.append('priority')
+
+            # Due date
+            if 'due_date' in data:
+                from datetime import date as date_type
+                new_due_date = data['due_date']
+                parsed_due_date = None
+                if new_due_date:
+                    try:
+                        parsed_due_date = date_type.fromisoformat(new_due_date)
+                    except ValueError:
+                        return JsonResponse({'error': 'Invalid date format'}, status=400)
+                if task.due_date != parsed_due_date:
+                    task.due_date = parsed_due_date
+                    updated_fields.append('due_date')
+
+            # Assignee (manager only)
+            if 'assignee_id' in data:
+                if tenant_role != 'MANAGER':
+                    return JsonResponse({'error': 'Only managers can change assignee'}, status=403)
+
+                new_assignee_id = data['assignee_id']
+                if new_assignee_id:
+                    from tasks.services import TaskService
+                    from core.models import User
+                    try:
+                        new_assignee = User.objects.get(id=new_assignee_id)
+                        TaskService.validate_assignee_in_tenant(task, new_assignee)
+                        if task.assignee_id != new_assignee_id:
+                            task.assignee = new_assignee
+                            updated_fields.append('assignee')
+                    except User.DoesNotExist:
+                        return JsonResponse({'error': 'Assignee not found'}, status=400)
+                    except ValidationError as e:
+                        return JsonResponse({'error': str(e)}, status=400)
+                else:
+                    if task.assignee_id is not None:
+                        task.assignee = None
+                        updated_fields.append('assignee')
+
+            # Save if any fields changed
+            if updated_fields:
+                task.save()
+
+                # Create audit log
+                from audit.models import AuditLog
+                AuditLog.objects.create(
+                    user=request.user,
+                    action='UPDATE',
+                    resource_type='Task',
+                    resource_id=task.id,
+                    changes={
+                        'updated_fields': updated_fields,
+                        'old_values': old_values,
+                        'new_values': {
+                            'title': task.title,
+                            'status': task.status,
+                            'priority': task.priority,
+                            'assignee_id': task.assignee_id,
+                            'due_date': str(task.due_date) if task.due_date else None,
+                        }
+                    }
+                )
+
+            # Return updated task data
+            return JsonResponse({
+                'id': task.id,
+                'title': task.title,
+                'project': task.project.name,
+                'assignee': task.assignee.get_full_name() if task.assignee else 'Unassigned',
+                'assignee_id': task.assignee_id,
+                'due_date': task.due_date.strftime('%Y-%m-%d') if task.due_date else '',
+                'priority': task.get_priority_display(),
+                'priority_value': task.priority,
+                'status': task.get_status_display(),
+                'status_value': task.status,
+                'updated_at': task.updated_at.strftime('%Y-%m-%d %H:%M:%S')
+            })
+
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON'}, status=400)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
 
 
 class ExportTasksView(LoginRequiredMixin, View):

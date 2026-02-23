@@ -204,6 +204,34 @@
     color: #6c757d;
 }
 
+/* Inline editing */
+#tasksTable tbody tr.editing {
+    background-color: #fff3cd !important;
+}
+
+#tasksTable tbody td input,
+#tasksTable tbody td select {
+    font-size: 0.875rem;
+    padding: 0.25rem 0.5rem;
+}
+
+#tasksTable tbody td input[type="text"] {
+    min-width: 150px;
+}
+
+#tasksTable tbody td input[type="date"] {
+    min-width: 130px;
+}
+
+#tasksTable tbody .btn-sm {
+    padding: 0.25rem 0.5rem;
+}
+
+#tasksTable tbody .btn-sm .icon-sm {
+    width: 14px;
+    height: 14px;
+}
+
 /* Responsive adjustments */
 @media (max-width: 767.98px) {
     .container-fluid {

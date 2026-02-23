@@ -1,5 +1,5 @@
 [x] TASK-01 mobile-first-ui
-[ ] TASK-02 dashboard-datatables-inline-edit
+[x] TASK-02 dashboard-datatables-inline-edit
 [ ] TASK-03 tenant-settings-manager-admin
 [ ] TASK-04 telegram-bot-tasks-projects-filters
 [ ] TASK-05 ai-helper-web-task-create-edit
