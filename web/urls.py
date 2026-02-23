@@ -4,6 +4,8 @@ from .views import (
     LogoutView,
     DashboardView,
     SettingsView,
+    TaskFormDemoView,
+    AITextSuggestionAPIView,
     TaskListAPIView,
     TaskInlineUpdateAPIView,
     ExportTasksView,
@@ -22,8 +24,10 @@ urlpatterns = [
     path('login/', LoginView.as_view(), name='login'),
     path('logout/', LogoutView.as_view(), name='logout'),
     path('settings/', SettingsView.as_view(), name='settings'),
+    path('ai-demo/', TaskFormDemoView.as_view(), name='ai_demo'),
     path('api/tasks/', TaskListAPIView.as_view(), name='api_tasks'),
     path('api/tasks/<int:task_id>/', TaskInlineUpdateAPIView.as_view(), name='task_inline_update'),
+    path('api/ai-suggest/', AITextSuggestionAPIView.as_view(), name='ai_suggest'),
     path('export/tasks/', ExportTasksView.as_view(), name='export_tasks'),
 
     # Telegram Bot API endpoints

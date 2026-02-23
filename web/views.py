@@ -6,14 +6,16 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from django.views import View
-from django.views.generic import TemplateView
-from django.shortcuts import render, redirect
+from django.views.generic import TemplateView, CreateView, UpdateView
+from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse, HttpResponse
 from django.db.models import Q
 from django.core.exceptions import ValidationError
 from django.contrib import messages
-from tasks.models import Task
-from core.models import TenantSettings
+from django.urls import reverse_lazy
+from tasks.models import Task, Project
+from core.models import TenantSettings, User
+from .llm_client import WebLLMClient
 
 
 class LoginView(View):
@@ -76,6 +78,24 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             context['todo_count'] = 0
             context['in_progress_count'] = 0
             context['done_count'] = 0
+
+        return context
+
+
+class TaskFormDemoView(LoginRequiredMixin, TemplateView):
+    """Demo view for AI helper on task forms"""
+    template_name = 'task_form_demo.html'
+    login_url = 'login'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        tenant = getattr(self.request, 'tenant', None)
+
+        if tenant:
+            settings, created = TenantSettings.objects.get_or_create(tenant=tenant)
+            context['ai_enabled'] = settings.ai_enabled
+        else:
+            context['ai_enabled'] = False
 
         return context
 
@@ -151,6 +171,75 @@ class SettingsView(LoginRequiredMixin, View):
         except Exception as e:
             messages.error(request, f'Error saving settings: {str(e)}')
             return self.get(request)
+
+
+class AITextSuggestionAPIView(LoginRequiredMixin, View):
+    """API endpoint for AI text suggestions"""
+    login_url = 'login'
+
+    def post(self, request):
+        try:
+            data = json.loads(request.body)
+            text = data.get('text', '').strip()
+            mode = data.get('mode', 'fix')  # 'fix' or 'translate'
+            field = data.get('field', 'title')  # 'title' or 'description'
+
+            if not text:
+                return JsonResponse({'error': 'Text is required'}, status=400)
+
+            tenant = getattr(request, 'tenant', None)
+            if not tenant:
+                return JsonResponse({'error': 'No tenant found'}, status=403)
+
+            # Get tenant settings
+            settings, created = TenantSettings.objects.get_or_create(tenant=tenant)
+
+            # Check if AI is enabled
+            if not settings.ai_enabled:
+                return JsonResponse({'error': 'AI features are not enabled for your tenant'}, status=403)
+
+            # Initialize LLM client
+            llm_client = WebLLMClient()
+
+            if not llm_client.is_available():
+                return JsonResponse({'error': 'AI service is not configured'}, status=500)
+
+            # Get improved text from LLM
+            result = llm_client.improve_text(
+                text=text,
+                system_prompt=settings.ai_system_prompt,
+                mode=mode,
+                target_language=settings.ai_default_language
+            )
+
+            if not result['success']:
+                return JsonResponse({'error': result.get('error', 'Failed to process text')}, status=500)
+
+            # Create audit log
+            from audit.models import AuditLog
+            AuditLog.objects.create(
+                user=request.user,
+                action='AI_SUGGESTION',
+                resource_type='Task',
+                resource_id=None,
+                changes={
+                    'field': field,
+                    'mode': mode,
+                    'original': text,
+                    'suggested': result['text']
+                }
+            )
+
+            return JsonResponse({
+                'original': text,
+                'suggested': result['text'],
+                'mode': mode
+            })
+
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON'}, status=400)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
 
 
 class TaskListAPIView(LoginRequiredMixin, View):

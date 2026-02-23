@@ -1,0 +1,152 @@
+{% extends 'base.html' %}
+
+{% block title %}AI Helper Demo - TaskPilot{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width: 800px;">
+    <div class="card">
+        <div class="card-header">
+            <h4 class="mb-0">
+                <i data-lucide="sparkles" class="icon-sm"></i>
+                AI Helper Demo - Task Form
+            </h4>
+        </div>
+        <div class="card-body">
+            <p class="text-muted">
+                This page demonstrates the AI helper feature for task creation/editing.
+                {% if not ai_enabled %}
+                <strong class="text-warning">Note: AI features are currently disabled. Managers can enable them in Settings.</strong>
+                {% endif %}
+            </p>
+
+            <hr>
+
+            <form id="taskForm">
+                {% csrf_token %}
+
+                <!-- Task Title -->
+                <div class="mb-4">
+                    <label for="task_title" class="form-label fw-bold">Task Title</label>
+                    <textarea class="form-control" id="task_title" name="title" rows="2"
+                              placeholder="Enter task title...">fix bug in login page need to do asap</textarea>
+                    {% if ai_enabled %}
+                    <div class="mt-2">
+                        <button type="button" class="btn btn-sm btn-outline-primary ai-btn"
+                                data-field="task_title" data-mode="fix">
+                            <i data-lucide="wand-2" class="icon-sm"></i>
+                            Fix Language
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary ai-btn"
+                                data-field="task_title" data-mode="translate">
+                            <i data-lucide="languages" class="icon-sm"></i>
+                            Translate
+                        </button>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Task Description -->
+                <div class="mb-4">
+                    <label for="task_description" class="form-label fw-bold">Description</label>
+                    <textarea class="form-control" id="task_description" name="description" rows="4"
+                              placeholder="Enter task description...">user cant login after password reset we need fix it very quick because customers complaining</textarea>
+                    {% if ai_enabled %}
+                    <div class="mt-2">
+                        <button type="button" class="btn btn-sm btn-outline-primary ai-btn"
+                                data-field="task_description" data-mode="fix">
+                            <i data-lucide="wand-2" class="icon-sm"></i>
+                            Fix Language
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary ai-btn"
+                                data-field="task_description" data-mode="translate">
+                            <i data-lucide="languages" class="icon-sm"></i>
+                            Translate
+                        </button>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="d-flex justify-content-between">
+                    <a href="{% url 'dashboard' %}" class="btn btn-secondary">
+                        <i data-lucide="arrow-left" class="icon-sm"></i>
+                        Back to Dashboard
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        <i data-lucide="save" class="icon-sm"></i>
+                        Save Task (Demo)
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- AI Suggestion Modal -->
+<div class="modal fade" id="aiSuggestionModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i data-lucide="sparkles" class="icon-sm"></i>
+                    AI Suggestion
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6 class="text-muted">Original:</h6>
+                        <div class="p-3 bg-light rounded" id="originalText"></div>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-success">Suggested:</h6>
+                        <div class="p-3 bg-success bg-opacity-10 rounded" id="suggestedText"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i data-lucide="x" class="icon-sm"></i>
+                    Cancel
+                </button>
+                <button type="button" class="btn btn-success" id="applyBtn">
+                    <i data-lucide="check" class="icon-sm"></i>
+                    Apply Suggestion
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.ai-btn {
+    transition: all 0.2s;
+}
+.ai-btn:hover {
+    transform: translateY(-1px);
+}
+.ai-btn.loading {
+    position: relative;
+    color: transparent;
+}
+.ai-btn.loading::after {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    top: 50%;
+    left: 50%;
+    margin-left: -8px;
+    margin-top: -8px;
+    border: 2px solid currentColor;
+    border-radius: 50%;
+    border-top-color: transparent;
+    animation: spinner 0.6s linear infinite;
+}
+@keyframes spinner {
+    to { transform: rotate(360deg); }
+}
+</style>
+
+<script src="/static/js/ai_helper.js"></script>
+{% endblock %}

@@ -35,6 +35,12 @@
                             Dashboard
                         </a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'ai_demo' %}">
+                            <i data-lucide="sparkles" class="icon-sm"></i>
+                            AI Demo
+                        </a>
+                    </li>
                     {% if request.tenant_role == 'MANAGER' %}
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'settings' %}">
