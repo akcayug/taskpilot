@@ -1,6 +1,6 @@
 import os
 import logging
-from telegram import Update
+from telegram import Update, BotCommand
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters
 from .handlers import BotHandlers
 from .api_client import TaskPilotAPI
@@ -11,6 +11,21 @@ logging.basicConfig(
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
+
+
+async def set_bot_commands(application):
+    """Set bot commands menu (hamburger icon)"""
+    commands = [
+        BotCommand("start", "Start the bot"),
+        BotCommand("help", "Show help and commands"),
+        BotCommand("tasks", "View all tasks"),
+        BotCommand("mytasks", "View your assigned tasks"),
+        BotCommand("newtask", "Create a new task"),
+        BotCommand("task", "View task details (task <id>)"),
+        BotCommand("link", "Link Telegram account"),
+    ]
+    await application.bot.set_my_commands(commands)
+    logger.info(f"Bot commands menu set with {len(commands)} commands")
 
 
 def main():
@@ -54,6 +69,9 @@ def main():
 
     # Register callback query handler
     application.add_handler(CallbackQueryHandler(bot_handlers.handle_callback))
+
+    # Set bot commands menu
+    application.post_init = set_bot_commands
 
     # Start the bot
     logger.info("Starting TaskPilot bot...")
