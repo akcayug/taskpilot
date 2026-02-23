@@ -34,10 +34,15 @@ class LLMClient:
         Returns:
             Improved task text or None on error
         """
+        import logging
+        logger = logging.getLogger(__name__)
+
         if not self.api_key:
+            logger.warning("OPENAI_API_KEY not set")
             return None
 
         try:
+            logger.info(f"Calling OpenAI API with mode={mode}, lang={target_language}")
             # Build user prompt based on mode
             if mode == 'translate':
                 language_names = {
@@ -71,10 +76,11 @@ class LLMClient:
             )
 
             improved_text = response.choices[0].message.content.strip()
+            logger.info(f"OpenAI API success: {improved_text[:100]}...")
             return improved_text
 
         except Exception as e:
-            print(f"LLM API error: {e}")
+            logger.exception(f"LLM API error: {e}")
             return None
 
     def is_available(self) -> bool:

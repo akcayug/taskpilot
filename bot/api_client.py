@@ -174,27 +174,45 @@ class TaskPilotAPI:
         Returns:
             Improved text or None on error
         """
+        import logging
+        logger = logging.getLogger(__name__)
+
         try:
             # Get tenant settings first
             settings = self.get_tenant_settings(telegram_id)
-            if not settings or not settings.get('ai_enabled'):
+            logger.info(f"Tenant settings for {telegram_id}: {settings}")
+
+            if not settings:
+                logger.warning(f"No tenant settings found for {telegram_id}")
+                return None
+
+            if not settings.get('ai_enabled'):
+                logger.warning(f"AI not enabled for tenant {telegram_id}")
                 return None
 
             # Use the LLM client directly
-            from .llm_client import BotLLMClient
-            llm = BotLLMClient()
+            from .llm_client import LLMClient
+            llm = LLMClient()
 
             if not llm.is_available():
+                logger.warning("LLM client not available (OPENAI_API_KEY missing?)")
                 return None
 
-            result = llm.improve_text(
+            logger.info(f"Improving text with AI: {text[:50]}...")
+            improved_text = llm.improve_task_text(
                 text=text,
                 system_prompt=settings.get('ai_system_prompt', ''),
                 mode=mode,
                 target_language=settings.get('ai_default_language', 'en')
             )
 
-            return result['text'] if result.get('success') else None
+            if improved_text:
+                logger.info(f"AI improvement successful: {improved_text[:50]}...")
+                return improved_text
+            else:
+                logger.error("AI improvement returned None")
+                return None
 
-        except Exception:
+        except Exception as e:
+            logger.exception(f"Exception in improve_text_with_ai: {e}")
             return None
