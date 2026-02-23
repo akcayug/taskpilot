@@ -82,7 +82,8 @@ class BotHandlers:
             return
 
         # Get user's tasks
-        tasks = self.api.get_user_tasks(telegram_id)
+        response = self.api.get_user_tasks(telegram_id)
+        tasks = response.get('tasks', [])
 
         if not tasks:
             await update.message.reply_text(
