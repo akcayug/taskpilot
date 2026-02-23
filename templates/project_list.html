@@ -1,0 +1,245 @@
+{% extends 'base.html' %}
+
+{% block title %}Projects - TaskPilot{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Mobile-first project cards */
+    .project-card {
+        background: #fff;
+        border-radius: 0.5rem;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        border-left: 4px solid #0d6efd;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .project-card:hover {
+        box-shadow: 0 4px 6px rgba(0,0,0,0.15);
+        transform: translateY(-2px);
+    }
+
+    .project-card-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #212529;
+        margin-bottom: 0.5rem;
+    }
+
+    .project-card-desc {
+        color: #6c757d;
+        font-size: 0.875rem;
+        margin-bottom: 0.75rem;
+    }
+
+    .project-stats {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        font-size: 0.875rem;
+    }
+
+    .project-stat {
+        background: #f8f9fa;
+        padding: 0.25rem 0.5rem;
+        border-radius: 0.25rem;
+        white-space: nowrap;
+    }
+
+    .project-actions {
+        margin-top: 0.75rem;
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    @media (min-width: 768px) {
+        .project-card {
+            cursor: default;
+        }
+
+        .project-card:hover {
+            transform: none;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>
+            <i data-lucide="folder" class="icon-sm"></i>
+            Projects
+        </h2>
+        {% if request.tenant_role == 'MANAGER' %}
+        <a href="{% url 'project_create' %}" class="btn btn-primary">
+            <i data-lucide="plus-circle" class="icon-sm"></i>
+            New Project
+        </a>
+        {% endif %}
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        {% endfor %}
+    {% endif %}
+
+    <!-- Desktop Table -->
+    <div class="card d-none d-md-block">
+        <div class="card-body">
+            <table id="projectsTable" class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Project Name</th>
+                        <th>Tasks</th>
+                        <th>Contract Total</th>
+                        <th>Retention</th>
+                        <th>Completion</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for project in projects %}
+                    <tr>
+                        <td>
+                            <strong>{{ project.name }}</strong>
+                            {% if project.description %}
+                            <br><small class="text-muted">{{ project.description|truncatewords:10 }}</small>
+                            {% endif %}
+                        </td>
+                        <td>{{ project.task_count }}</td>
+                        <td>
+                            {% if project.contract_total_amount %}
+                            ${{ project.contract_total_amount|floatformat:0 }}
+                            {% else %}
+                            <span class="text-muted">Not set</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if project.contract_retention_total %}
+                            ${{ project.contract_retention_total|floatformat:0 }}
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if project.latest_snapshot %}
+                            <span class="badge bg-success">{{ project.latest_snapshot.completion_percentage|floatformat:1 }}%</span>
+                            {% else %}
+                            <span class="text-muted">No data</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <a href="{% url 'project_detail' project.id %}" class="btn btn-outline-primary" title="View Details">
+                                    <i data-lucide="eye" class="icon-sm"></i>
+                                </a>
+                                {% if request.tenant_role == 'MANAGER' %}
+                                <a href="{% url 'project_edit' project.id %}" class="btn btn-outline-secondary" title="Edit">
+                                    <i data-lucide="edit" class="icon-sm"></i>
+                                </a>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-4">
+                            No projects found.
+                            {% if request.tenant_role == 'MANAGER' %}
+                            <a href="{% url 'project_create' %}">Create your first project</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Mobile Cards -->
+    <div class="d-md-none">
+        {% for project in projects %}
+        <div class="project-card" onclick="window.location.href='{% url 'project_detail' project.id %}'">
+            <div class="project-card-title">
+                <i data-lucide="folder" class="icon-sm"></i>
+                {{ project.name }}
+            </div>
+
+            {% if project.description %}
+            <div class="project-card-desc">
+                {{ project.description|truncatewords:15 }}
+            </div>
+            {% endif %}
+
+            <div class="project-stats">
+                <div class="project-stat">
+                    <i data-lucide="list" class="icon-sm"></i>
+                    {{ project.task_count }} tasks
+                </div>
+                {% if project.contract_total_amount %}
+                <div class="project-stat">
+                    <i data-lucide="dollar-sign" class="icon-sm"></i>
+                    ${{ project.contract_total_amount|floatformat:0 }}
+                </div>
+                {% endif %}
+                {% if project.latest_snapshot %}
+                <div class="project-stat">
+                    <i data-lucide="trending-up" class="icon-sm"></i>
+                    {{ project.latest_snapshot.completion_percentage|floatformat:1 }}% complete
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="project-actions" onclick="event.stopPropagation();">
+                <a href="{% url 'project_detail' project.id %}" class="btn btn-sm btn-outline-primary">
+                    <i data-lucide="eye" class="icon-sm"></i>
+                    View
+                </a>
+                {% if request.tenant_role == 'MANAGER' %}
+                <a href="{% url 'project_edit' project.id %}" class="btn btn-sm btn-outline-secondary">
+                    <i data-lucide="edit" class="icon-sm"></i>
+                    Edit
+                </a>
+                {% endif %}
+            </div>
+        </div>
+        {% empty %}
+        <div class="text-center text-muted py-4">
+            <i data-lucide="folder-x" style="width: 48px; height: 48px; opacity: 0.5;"></i>
+            <p class="mt-2">No projects found</p>
+            {% if request.tenant_role == 'MANAGER' %}
+            <a href="{% url 'project_create' %}" class="btn btn-primary mt-2">
+                <i data-lucide="plus-circle" class="icon-sm"></i>
+                Create First Project
+            </a>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        // Initialize DataTables for desktop view
+        if (window.innerWidth >= 768) {
+            $('#projectsTable').DataTable({
+                order: [[0, 'asc']],
+                pageLength: 25,
+                language: {
+                    emptyTable: "No projects found"
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}

@@ -112,7 +112,7 @@ class TenantSettings(models.Model):
     tenant = models.OneToOneField(Tenant, on_delete=models.CASCADE, related_name='settings')
     ai_enabled = models.BooleanField(default=False)
     ai_system_prompt = models.TextField(
-        max_length=500,
+        max_length=700,
         default='You are a helpful assistant that improves task descriptions. Keep responses clear and concise.'
     )
     ai_default_mode = models.CharField(

@@ -3,7 +3,7 @@ OpenAI LLM client for web task form AI assistance
 """
 import os
 from typing import Optional
-import openai
+from openai import OpenAI
 
 
 class WebLLMClient:
@@ -11,8 +11,9 @@ class WebLLMClient:
 
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key or os.getenv('OPENAI_API_KEY')
+        self.client = None
         if self.api_key:
-            openai.api_key = self.api_key
+            self.client = OpenAI(api_key=self.api_key)
 
     def improve_text(
         self,
@@ -53,7 +54,8 @@ class WebLLMClient:
                     'tr': 'Turkish',
                     'de': 'German',
                     'fr': 'French',
-                    'es': 'Spanish'
+                    'es': 'Spanish',
+                    'ru': 'Russian'
                 }
                 target_lang_name = language_names.get(target_language, 'English')
                 user_prompt = (
@@ -66,8 +68,8 @@ class WebLLMClient:
                     f"Fix grammar, make it clear and professional:\n\n{text}"
                 )
 
-            # Call OpenAI API
-            response = openai.ChatCompletion.create(
+            # Call OpenAI API (v1.x format)
+            response = self.client.chat.completions.create(
                 model="gpt-4",
                 messages=[
                     {"role": "system", "content": system_prompt},
@@ -84,27 +86,25 @@ class WebLLMClient:
                 'text': improved_text
             }
 
-        except openai.error.AuthenticationError:
-            return {
-                'success': False,
-                'error': 'Invalid OpenAI API key'
-            }
-        except openai.error.RateLimitError:
-            return {
-                'success': False,
-                'error': 'Rate limit exceeded. Please try again later.'
-            }
-        except openai.error.APIError as e:
-            return {
-                'success': False,
-                'error': f'OpenAI API error: {str(e)}'
-            }
         except Exception as e:
-            return {
-                'success': False,
-                'error': f'Unexpected error: {str(e)}'
-            }
+            error_msg = str(e)
+            # Check for common error types
+            if 'authentication' in error_msg.lower() or 'api key' in error_msg.lower():
+                return {
+                    'success': False,
+                    'error': 'Invalid OpenAI API key'
+                }
+            elif 'rate limit' in error_msg.lower():
+                return {
+                    'success': False,
+                    'error': 'Rate limit exceeded. Please try again later.'
+                }
+            else:
+                return {
+                    'success': False,
+                    'error': f'AI service error: {error_msg}'
+                }
 
     def is_available(self) -> bool:
         """Check if LLM API is available"""
-        return self.api_key is not None
+        return self.client is not None

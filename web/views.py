@@ -9,6 +9,7 @@ from django.views import View
 from django.views.generic import TemplateView, CreateView, UpdateView
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse, HttpResponse, HttpResponseForbidden
+from django.db import models
 from django.db.models import Q
 from django.core.exceptions import ValidationError
 from django.contrib import messages
@@ -301,8 +302,8 @@ class SettingsView(LoginRequiredMixin, View):
             if not ai_system_prompt:
                 messages.error(request, 'AI system prompt is required')
                 return self.get(request)
-            if len(ai_system_prompt) > 500:
-                messages.error(request, 'AI system prompt must be 500 characters or less')
+            if len(ai_system_prompt) > 700:
+                messages.error(request, 'AI system prompt must be 700 characters or less')
                 return self.get(request)
             settings.ai_system_prompt = ai_system_prompt
 
@@ -1164,6 +1165,118 @@ class TelegramSettingsAPIView(View):
             'ai_default_mode': settings.ai_default_mode,
             'ai_default_language': settings.ai_default_language
         })
+
+
+class ProjectListView(LoginRequiredMixin, TemplateView):
+    """List all projects with financial summaries"""
+    template_name = 'project_list.html'
+    login_url = 'login'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        tenant = getattr(self.request, 'tenant', None)
+
+        if tenant:
+            # Get all projects with task counts and latest snapshots
+            projects = Project.objects.filter(tenant=tenant).prefetch_related(
+                'financial_snapshots'
+            ).annotate(
+                task_count=models.Count('tasks')
+            ).order_by('name')
+
+            # Add latest snapshot to each project
+            for project in projects:
+                project.latest_snapshot = project.financial_snapshots.order_by('-created_at').first()
+
+            context['projects'] = projects
+
+        return context
+
+
+class ProjectFormView(LoginRequiredMixin, View):
+    """Create and edit projects (manager-only)"""
+    template_name = 'project_form.html'
+    login_url = 'login'
+
+    def dispatch(self, request, *args, **kwargs):
+        # Only managers can create/edit projects
+        tenant_role = getattr(request, 'tenant_role', None)
+        if tenant_role != 'MANAGER':
+            messages.error(request, "Only managers can create or edit projects")
+            return redirect('project_list')
+        return super().dispatch(request, *args, **kwargs)
+
+    def get(self, request, project_id=None):
+        tenant = getattr(request, 'tenant')
+        context = {}
+
+        if project_id:
+            context['project'] = get_object_or_404(Project, id=project_id, tenant=tenant)
+
+        return render(request, self.template_name, context)
+
+    def post(self, request, project_id=None):
+        tenant = getattr(request, 'tenant')
+
+        # Get form data
+        name = request.POST.get('name', '').strip()
+        description = request.POST.get('description', '').strip()
+        contract_total = request.POST.get('contract_total_amount', '').strip()
+        contract_retention = request.POST.get('contract_retention_total', '').strip()
+
+        # Validate
+        if not name:
+            messages.error(request, "Project name is required")
+            return self.get(request, project_id)
+
+        # Parse financial values
+        try:
+            contract_total_amount = Decimal(contract_total) if contract_total else None
+            contract_retention_total = Decimal(contract_retention) if contract_retention else None
+
+            # Validate non-negative
+            if contract_total_amount and contract_total_amount < 0:
+                messages.error(request, "Contract total cannot be negative")
+                return self.get(request, project_id)
+
+            if contract_retention_total and contract_retention_total < 0:
+                messages.error(request, "Retention total cannot be negative")
+                return self.get(request, project_id)
+
+            # Validate retention <= total
+            if (contract_total_amount and contract_retention_total and
+                contract_retention_total > contract_total_amount):
+                messages.error(request, "Retention cannot exceed contract total")
+                return self.get(request, project_id)
+
+        except (ValueError, TypeError):
+            messages.error(request, "Invalid financial values")
+            return self.get(request, project_id)
+
+        # Create or update project
+        if project_id:
+            # Update existing
+            project = get_object_or_404(Project, id=project_id, tenant=tenant)
+            project.name = name
+            project.description = description
+            project.contract_total_amount = contract_total_amount
+            project.contract_retention_total = contract_retention_total
+            project.save()
+
+            messages.success(request, f"Project '{project.name}' updated successfully")
+        else:
+            # Create new
+            project = Project.objects.create(
+                tenant=tenant,
+                name=name,
+                description=description,
+                contract_total_amount=contract_total_amount,
+                contract_retention_total=contract_retention_total
+            )
+
+            messages.success(request, f"Project '{project.name}' created successfully")
+
+        return redirect('project_list')
 
 
 class ProjectDetailView(LoginRequiredMixin, TemplateView):

@@ -48,9 +48,9 @@
                         <span class="text-danger">*</span>
                     </label>
                     <textarea class="form-control" id="ai_system_prompt" name="ai_system_prompt"
-                              rows="4" maxlength="500" required>{{ settings.ai_system_prompt }}</textarea>
+                              rows="6" maxlength="700" required>{{ settings.ai_system_prompt }}</textarea>
                     <div class="form-text">
-                        Instructions for the AI when processing tasks (max 500 characters)
+                        Instructions for the AI when processing tasks (max 700 characters)
                     </div>
                     <div class="text-end">
                         <small id="charCount" class="text-muted"></small>
@@ -119,13 +119,13 @@
     function updateCharCount() {
         // Match backend validation: trim and count
         const trimmedLength = textarea.value.trim().length;
-        charCount.textContent = `${trimmedLength} / 500 characters`;
-        if (trimmedLength > 450) {
+        charCount.textContent = `${trimmedLength} / 700 characters`;
+        if (trimmedLength > 600) {
             charCount.classList.add('text-warning');
         } else {
             charCount.classList.remove('text-warning');
         }
-        if (trimmedLength > 500) {
+        if (trimmedLength > 700) {
             charCount.classList.remove('text-warning');
             charCount.classList.add('text-danger');
         }

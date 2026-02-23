@@ -3,7 +3,7 @@ OpenAI LLM client for task description improvement and translation
 """
 import os
 from typing import Optional
-import openai
+from openai import OpenAI
 
 
 class LLMClient:
@@ -11,8 +11,9 @@ class LLMClient:
 
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key or os.getenv('OPENAI_API_KEY')
+        self.client = None
         if self.api_key:
-            openai.api_key = self.api_key
+            self.client = OpenAI(api_key=self.api_key)
 
     def improve_task_text(
         self,
@@ -44,7 +45,8 @@ class LLMClient:
                     'tr': 'Turkish',
                     'de': 'German',
                     'fr': 'French',
-                    'es': 'Spanish'
+                    'es': 'Spanish',
+                    'ru': 'Russian'
                 }
                 target_lang_name = language_names.get(target_language, 'English')
                 user_prompt = (
@@ -57,8 +59,8 @@ class LLMClient:
                     f"Fix grammar, make it clear and professional:\n\n{text}"
                 )
 
-            # Call OpenAI API
-            response = openai.ChatCompletion.create(
+            # Call OpenAI API (v1.x format)
+            response = self.client.chat.completions.create(
                 model="gpt-4",
                 messages=[
                     {"role": "system", "content": system_prompt},
@@ -77,4 +79,4 @@ class LLMClient:
 
     def is_available(self) -> bool:
         """Check if LLM API is available"""
-        return self.api_key is not None
+        return self.client is not None

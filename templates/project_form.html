@@ -1,0 +1,183 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if project %}Edit Project{% else %}New Project{% endif %} - TaskPilot{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 1rem;
+    }
+
+    @media (min-width: 768px) {
+        .form-container {
+            padding: 2rem;
+        }
+    }
+
+    .form-section {
+        background: #fff;
+        border-radius: 0.5rem;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .form-section h5 {
+        color: #495057;
+        font-size: 1rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid #e9ecef;
+    }
+
+    .required-field::after {
+        content: " *";
+        color: #dc3545;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="form-container">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>
+            <i data-lucide="{% if project %}edit{% else %}plus-circle{% endif %}" class="icon-sm"></i>
+            {% if project %}Edit Project{% else %}New Project{% endif %}
+        </h2>
+        <a href="{% url 'project_list' %}" class="btn btn-sm btn-outline-secondary">
+            <i data-lucide="x" class="icon-sm"></i>
+            Cancel
+        </a>
+    </div>
+
+    {% if form.errors or messages %}
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <strong>Please correct the following errors:</strong>
+        <ul class="mb-0 mt-2">
+            {% for field, errors in form.errors.items %}
+                {% for error in errors %}
+                <li>{{ field|title }}: {{ error }}</li>
+                {% endfor %}
+            {% endfor %}
+            {% for message in messages %}
+                <li>{{ message }}</li>
+            {% endfor %}
+        </ul>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endif %}
+
+    <form method="post">
+        {% csrf_token %}
+
+        <!-- Basic Information -->
+        <div class="form-section">
+            <h5>
+                <i data-lucide="info" class="icon-sm"></i>
+                Basic Information
+            </h5>
+
+            <div class="mb-3">
+                <label for="name" class="form-label fw-bold required-field">Project Name</label>
+                <input type="text" class="form-control" id="name" name="name"
+                       value="{% if project %}{{ project.name }}{% endif %}"
+                       maxlength="200" required
+                       placeholder="e.g., Website Redesign, Mobile App Development">
+                <small class="text-muted">Clear, descriptive project name</small>
+            </div>
+
+            <div class="mb-3">
+                <label for="description" class="form-label fw-bold">Description</label>
+                <textarea class="form-control" id="description" name="description" rows="4"
+                          placeholder="Project overview, objectives, and scope...">{% if project %}{{ project.description }}{% endif %}</textarea>
+                <small class="text-muted">Detailed project description and goals</small>
+            </div>
+        </div>
+
+        <!-- Financial Information -->
+        <div class="form-section">
+            <h5>
+                <i data-lucide="dollar-sign" class="icon-sm"></i>
+                Financial Information
+            </h5>
+
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label for="contract_total_amount" class="form-label fw-bold">Contract Total Amount</label>
+                    <div class="input-group">
+                        <span class="input-group-text">$</span>
+                        <input type="number" class="form-control" id="contract_total_amount"
+                               name="contract_total_amount" step="0.01" min="0"
+                               value="{% if project and project.contract_total_amount %}{{ project.contract_total_amount }}{% endif %}"
+                               placeholder="0.00">
+                    </div>
+                    <small class="text-muted">Total contract value</small>
+                </div>
+
+                <div class="col-md-6 mb-3">
+                    <label for="contract_retention_total" class="form-label fw-bold">Total Retention Amount</label>
+                    <div class="input-group">
+                        <span class="input-group-text">$</span>
+                        <input type="number" class="form-control" id="contract_retention_total"
+                               name="contract_retention_total" step="0.01" min="0"
+                               value="{% if project and project.contract_retention_total %}{{ project.contract_retention_total }}{% endif %}"
+                               placeholder="0.00">
+                    </div>
+                    <small class="text-muted">Amount held as retention</small>
+                </div>
+            </div>
+
+            <div class="alert alert-info" role="alert">
+                <i data-lucide="info" class="icon-sm"></i>
+                <strong>Note:</strong> Financial snapshots can be created after project is saved.
+                Visit the project detail page to track completion and payments.
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="d-flex justify-content-between align-items-center gap-2">
+            <a href="{% url 'project_list' %}" class="btn btn-secondary">
+                <i data-lucide="arrow-left" class="icon-sm"></i>
+                Back to Projects
+            </a>
+
+            <button type="submit" class="btn btn-{% if project %}primary{% else %}success{% endif %}">
+                <i data-lucide="{% if project %}save{% else %}plus-circle{% endif %}" class="icon-sm"></i>
+                {% if project %}Update Project{% else %}Create Project{% endif %}
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Form validation
+    (function() {
+        'use strict';
+        var forms = document.querySelectorAll('form');
+        Array.prototype.slice.call(forms).forEach(function(form) {
+            form.addEventListener('submit', function(event) {
+                if (!form.checkValidity()) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+                form.classList.add('was-validated');
+            }, false);
+        });
+    })();
+
+    // Auto-format currency inputs
+    const currencyInputs = document.querySelectorAll('input[type="number"][step="0.01"]');
+    currencyInputs.forEach(input => {
+        input.addEventListener('blur', function() {
+            if (this.value) {
+                this.value = parseFloat(this.value).toFixed(2);
+            }
+        });
+    });
+</script>
+{% endblock %}
