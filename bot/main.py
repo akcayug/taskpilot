@@ -33,12 +33,20 @@ def main():
 
     # Register command handlers
     application.add_handler(CommandHandler("start", bot_handlers.start_command))
+    application.add_handler(CommandHandler("help", bot_handlers.help_command))
     application.add_handler(CommandHandler("link", bot_handlers.link_command))
+    application.add_handler(CommandHandler("tasks", bot_handlers.tasks_command))
     application.add_handler(CommandHandler("mytasks", bot_handlers.my_tasks_command))
     application.add_handler(CommandHandler("newtask", bot_handlers.new_task_command))
     application.add_handler(CommandHandler("task", bot_handlers.task_command))
 
-    # Register message handler (for task creation flow)
+    # Register voice message handler (for task description)
+    application.add_handler(MessageHandler(
+        filters.VOICE,
+        bot_handlers.handle_voice
+    ))
+
+    # Register text message handler (for task creation flow)
     application.add_handler(MessageHandler(
         filters.TEXT & ~filters.COMMAND,
         bot_handlers.handle_message

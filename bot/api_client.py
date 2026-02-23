@@ -36,14 +36,26 @@ class TaskPilotAPI:
         except requests.RequestException:
             return None
 
-    def get_user_tasks(self, telegram_id: int, status: Optional[str] = None, project_id: Optional[int] = None) -> Dict:
-        """Get tasks assigned to user with optional filters"""
+    def get_user_tasks(
+        self,
+        telegram_id: int,
+        status: Optional[str] = None,
+        project_id: Optional[int] = None,
+        assignee_id: Optional[int] = None
+    ) -> Dict:
+        """Get tasks visible to user with optional filters
+
+        For managers: returns all tenant tasks
+        For members: returns only assigned tasks
+        """
         try:
             params = {'telegram_id': telegram_id}
             if status:
                 params['status'] = status
             if project_id:
                 params['project_id'] = project_id
+            if assignee_id:
+                params['assignee_id'] = assignee_id
 
             response = self.session.get(
                 f"{self.base_url}/api/telegram/tasks",
@@ -149,4 +161,40 @@ class TaskPilotAPI:
             response.raise_for_status()
             return response.json()
         except requests.RequestException:
+            return None
+
+    def improve_text_with_ai(self, telegram_id: int, text: str, mode: str = 'fix') -> Optional[str]:
+        """Improve text using tenant's AI settings
+
+        Args:
+            telegram_id: User's Telegram ID
+            text: Text to improve
+            mode: 'fix' for fixing language or 'translate' for translation
+
+        Returns:
+            Improved text or None on error
+        """
+        try:
+            # Get tenant settings first
+            settings = self.get_tenant_settings(telegram_id)
+            if not settings or not settings.get('ai_enabled'):
+                return None
+
+            # Use the LLM client directly
+            from .llm_client import BotLLMClient
+            llm = BotLLMClient()
+
+            if not llm.is_available():
+                return None
+
+            result = llm.improve_text(
+                text=text,
+                system_prompt=settings.get('ai_system_prompt', ''),
+                mode=mode,
+                target_language=settings.get('ai_default_language', 'en')
+            )
+
+            return result['text'] if result.get('success') else None
+
+        except Exception:
             return None

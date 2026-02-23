@@ -26,7 +26,8 @@ class BotHandlers:
         if user:
             await update.message.reply_text(
                 f"Welcome back, {user['first_name']}! 👋\n\n"
-                "Use /mytasks to see your tasks or /newtask to create a new one."
+                "Use /help to see all available commands.",
+                reply_markup=self._get_main_menu()
             )
         else:
             await update.message.reply_text(
@@ -38,6 +39,38 @@ class BotHandlers:
                 "4. Use the command: /link <YOUR_CODE>\n\n"
                 "After linking, you'll be able to manage your tasks right here in Telegram!"
             )
+
+    def _get_main_menu(self):
+        """Get the persistent main menu keyboard"""
+        from telegram import ReplyKeyboardMarkup, KeyboardButton
+
+        keyboard = [
+            [KeyboardButton("/tasks"), KeyboardButton("/mytasks")],
+            [KeyboardButton("/newtask"), KeyboardButton("/help")]
+        ]
+        return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, persistent=True)
+
+    async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /help command"""
+        help_text = (
+            "📚 *TaskPilot Bot Commands*\n\n"
+            "*Task Management:*\n"
+            "/tasks - View all visible tasks\n"
+            "/tasks <project> - Filter tasks by project name\n"
+            "/tasks @<user> - Filter tasks by assignee\n"
+            "/mytasks - View only your assigned tasks\n"
+            "/task <id> - View task details\n"
+            "/newtask - Create a new task\n\n"
+            "*Account:*\n"
+            "/link <code> - Link your Telegram account\n"
+            "/start - Start the bot\n"
+            "/help - Show this help message\n\n"
+            "*Tips:*\n"
+            "• Send voice messages during task creation for automatic transcription\n"
+            "• Managers can see all tenant tasks\n"
+            "• Members can only see assigned tasks\n"
+        )
+        await update.message.reply_text(help_text, parse_mode='Markdown')
 
     async def link_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /link <code> command"""
@@ -64,12 +97,15 @@ class BotHandlers:
             await update.message.reply_text(
                 "✅ Account linked successfully!\n\n"
                 "You can now use:\n"
+                "• /tasks - View all tasks\n"
                 "• /mytasks - View your assigned tasks\n"
-                "• /newtask - Create a new task"
+                "• /newtask - Create a new task\n"
+                "• /help - See all commands",
+                reply_markup=self._get_main_menu()
             )
 
-    async def my_tasks_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle /mytasks command"""
+    async def tasks_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /tasks command with optional filters"""
         telegram_id = update.effective_user.id
 
         # Check if user is linked
@@ -81,8 +117,121 @@ class BotHandlers:
             )
             return
 
-        # Get user's tasks
-        response = self.api.get_user_tasks(telegram_id)
+        # Parse filter arguments
+        project_filter = None
+        assignee_filter = None
+
+        if context.args:
+            filter_arg = ' '.join(context.args)
+
+            # Check if it's a user filter (starts with @)
+            if filter_arg.startswith('@'):
+                username = filter_arg[1:].strip()
+                # Get tenant members to find user ID
+                members = self.api.get_tenant_members(telegram_id)
+                for member in members:
+                    if member.get('username', '').lower() == username.lower():
+                        assignee_filter = member['id']
+                        break
+
+                if not assignee_filter:
+                    await update.message.reply_text(
+                        f"❌ User @{username} not found in your tenant."
+                    )
+                    return
+            else:
+                # Treat as project name filter
+                projects = self.api.get_user_projects(telegram_id)
+                for project in projects:
+                    if project['name'].lower() == filter_arg.lower():
+                        project_filter = project['id']
+                        break
+
+                if not project_filter:
+                    await update.message.reply_text(
+                        f"❌ Project '{filter_arg}' not found."
+                    )
+                    return
+
+        # Get tasks with filters
+        response = self.api.get_user_tasks(
+            telegram_id,
+            project_id=project_filter,
+            assignee_id=assignee_filter
+        )
+        tasks = response.get('tasks', [])
+        is_manager = response.get('is_manager', False)
+
+        if not tasks:
+            filter_text = ""
+            if project_filter:
+                filter_text = " matching this filter"
+            await update.message.reply_text(
+                f"📋 No tasks found{filter_text}.\n\n"
+                "Use /newtask to create a new task."
+            )
+            return
+
+        # Format tasks
+        status_emojis = {
+            'TODO': '📋',
+            'IN_PROGRESS': '⏳',
+            'DONE': '✅',
+            'ARCHIVED': '📦'
+        }
+
+        priority_emojis = {
+            'HIGH': '🔴',
+            'MEDIUM': '🟡',
+            'LOW': '🟢'
+        }
+
+        # Header
+        if project_filter:
+            header = f"📋 *Tasks in {[p['name'] for p in self.api.get_user_projects(telegram_id) if p['id'] == project_filter][0]}*\n\n"
+        elif assignee_filter:
+            header = f"📋 *Tasks for {context.args[0]}*\n\n"
+        elif is_manager:
+            header = "📋 *All Tenant Tasks*\n\n"
+        else:
+            header = "📋 *Your Visible Tasks*\n\n"
+
+        message = header
+
+        for task in tasks[:10]:  # Limit to 10 tasks
+            status_emoji = status_emojis.get(task['status'], '•')
+            priority_emoji = priority_emojis.get(task['priority'], '•')
+
+            message += (
+                f"{status_emoji} *{task['title']}*\n"
+                f"   {priority_emoji} {task['priority']} | "
+                f"Project: {task['project']}\n"
+                f"   Assignee: {task['assignee']}\n"
+                f"   ID: #{task['id']}\n\n"
+            )
+
+        if len(tasks) > 10:
+            message += f"\n_...and {len(tasks) - 10} more tasks_\n"
+
+        message += "\n💡 Use /task <ID> to see details"
+
+        await update.message.reply_text(message, parse_mode='Markdown')
+
+    async def my_tasks_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /mytasks command - only shows tasks assigned to you"""
+        telegram_id = update.effective_user.id
+
+        # Check if user is linked
+        user = self.api.get_user_by_telegram_id(telegram_id)
+        if not user:
+            await update.message.reply_text(
+                "❌ You need to link your account first.\n"
+                f"Visit {self.web_url} to get your linking code, then use /link <CODE>"
+            )
+            return
+
+        # Get only tasks assigned to this user
+        response = self.api.get_user_tasks(telegram_id, assignee_id=user.get('id'))
         tasks = response.get('tasks', [])
 
         if not tasks:
@@ -345,6 +494,105 @@ class BotHandlers:
                 await update.message.reply_text(msg, parse_mode='Markdown')
             context.user_data.clear()
 
+    async def handle_voice(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle voice messages for task description"""
+        step = context.user_data.get('task_creation_step')
+
+        # Only process voice in description step
+        if step != 'awaiting_description':
+            await update.message.reply_text(
+                "🎤 Voice messages are only supported when entering task description.\n"
+                "Use /newtask to create a task."
+            )
+            return
+
+        telegram_id = update.effective_user.id
+
+        await update.message.reply_text("🎤 Transcribing voice message...")
+
+        try:
+            # Download voice file
+            voice_file = await update.message.voice.get_file()
+            import tempfile
+            import os
+
+            with tempfile.NamedTemporaryFile(suffix='.ogg', delete=False) as tmp_file:
+                tmp_path = tmp_file.name
+                await voice_file.download_to_drive(tmp_path)
+
+            # Transcribe
+            from .speech_client import SpeechClient
+            speech_client = SpeechClient()
+
+            if not speech_client.is_available():
+                await update.message.reply_text(
+                    "❌ Voice transcription is not available. AI features need to be configured.\n"
+                    "Please type your description instead."
+                )
+                os.unlink(tmp_path)
+                return
+
+            transcribed_text = await speech_client.transcribe_voice_message(tmp_path)
+            os.unlink(tmp_path)
+
+            if not transcribed_text:
+                await update.message.reply_text(
+                    "❌ Failed to transcribe voice message. Please type your description instead."
+                )
+                return
+
+            # Improve with AI
+            await update.message.reply_text(
+                f"📝 Transcribed: _{transcribed_text}_\n\n"
+                "✨ Improving with AI...",
+                parse_mode='Markdown'
+            )
+
+            improved_text = self.api.improve_text_with_ai(telegram_id, transcribed_text, mode='fix')
+
+            if improved_text and improved_text != transcribed_text:
+                # Show improved version with approval button
+                from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+
+                keyboard = [[
+                    InlineKeyboardButton("✅ Use This", callback_data='voice_approve'),
+                    InlineKeyboardButton("✏️ Edit", callback_data='voice_edit')
+                ]]
+
+                context.user_data['voice_transcribed'] = transcribed_text
+                context.user_data['voice_improved'] = improved_text
+
+                await update.message.reply_text(
+                    f"✨ *Improved Description:*\n\n{improved_text}\n\n"
+                    "Choose an option:",
+                    parse_mode='Markdown',
+                    reply_markup=InlineKeyboardMarkup(keyboard)
+                )
+            else:
+                # Use transcribed text directly
+                context.user_data['task_description'] = transcribed_text
+
+                # Continue to assignee selection
+                members = self.api.get_tenant_members(telegram_id)
+                if members:
+                    context.user_data['task_creation_step'] = 'awaiting_assignee'
+                    await update.message.reply_text(
+                        "👤 Select assignee:",
+                        reply_markup=get_assignee_keyboard(members)
+                    )
+                else:
+                    context.user_data['task_creation_step'] = 'awaiting_priority'
+                    await update.message.reply_text(
+                        "Select the priority:",
+                        reply_markup=get_priority_keyboard()
+                    )
+
+        except Exception as e:
+            await update.message.reply_text(
+                f"❌ Error processing voice message: {str(e)}\n"
+                "Please type your description instead."
+            )
+
     async def handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle callback queries from inline keyboards"""
         query = update.callback_query
@@ -357,6 +605,43 @@ class BotHandlers:
         if data == 'cancel':
             context.user_data.clear()
             await query.edit_message_text("❌ Action cancelled.")
+            return
+
+        # Voice message approval
+        if data == 'voice_approve':
+            improved_text = context.user_data.get('voice_improved')
+            if improved_text:
+                context.user_data['task_description'] = improved_text
+                await query.edit_message_text(
+                    f"✅ *Description saved:*\n\n{improved_text}",
+                    parse_mode='Markdown'
+                )
+
+                # Continue to assignee selection
+                members = self.api.get_tenant_members(telegram_id)
+                if members:
+                    context.user_data['task_creation_step'] = 'awaiting_assignee'
+                    await query.message.reply_text(
+                        "👤 Select assignee:",
+                        reply_markup=get_assignee_keyboard(members)
+                    )
+                else:
+                    context.user_data['task_creation_step'] = 'awaiting_priority'
+                    await query.message.reply_text(
+                        "Select the priority:",
+                        reply_markup=get_priority_keyboard()
+                    )
+            return
+
+        # Voice message edit (use original transcription)
+        if data == 'voice_edit':
+            transcribed_text = context.user_data.get('voice_transcribed')
+            await query.edit_message_text(
+                f"📝 Original transcription:\n\n_{transcribed_text}_\n\n"
+                "Please type your edited description:",
+                parse_mode='Markdown'
+            )
+            # Stay in awaiting_description step so user can type
             return
 
         # Project selection (step 1)

@@ -851,6 +851,13 @@ class TelegramTasksAPIView(View):
             except (ValueError, TypeError):
                 pass
 
+        assignee_filter = request.GET.get('assignee_id')
+        if assignee_filter:
+            try:
+                tasks = tasks.filter(assignee_id=int(assignee_filter))
+            except (ValueError, TypeError):
+                pass
+
         tasks = tasks.order_by('-created_at')[:50]
 
         tasks_data = []
