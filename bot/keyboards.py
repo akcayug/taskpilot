@@ -125,3 +125,40 @@ def get_confirm_keyboard(action, task_id=None):
     ]
 
     return InlineKeyboardMarkup(keyboard)
+
+
+def get_filter_keyboard():
+    """Create inline keyboard for task filtering options"""
+    keyboard = [
+        [InlineKeyboardButton("🔍 Filter by Status", callback_data="filter_status")],
+        [InlineKeyboardButton("📁 Filter by Project", callback_data="filter_project")],
+        [InlineKeyboardButton("🔄 Clear Filters", callback_data="clear_filters")],
+        [InlineKeyboardButton("◀️ Back", callback_data="cancel")]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+def get_status_filter_keyboard():
+    """Create inline keyboard for status filter selection"""
+    keyboard = [
+        [InlineKeyboardButton("📋 To Do", callback_data="filter_status_TODO")],
+        [InlineKeyboardButton("⏳ In Progress", callback_data="filter_status_IN_PROGRESS")],
+        [InlineKeyboardButton("✅ Done", callback_data="filter_status_DONE")],
+        [InlineKeyboardButton("📦 Archived", callback_data="filter_status_ARCHIVED")],
+        [InlineKeyboardButton("🔄 All Statuses", callback_data="filter_status_all")],
+        [InlineKeyboardButton("◀️ Back", callback_data="back_to_filters")]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+def get_project_filter_keyboard(projects):
+    """Create inline keyboard for project filter selection"""
+    keyboard = []
+    for project in projects:
+        keyboard.append([InlineKeyboardButton(
+            f"📁 {project['name']}",
+            callback_data=f"filter_project_{project['id']}"
+        )])
+    keyboard.append([InlineKeyboardButton("🔄 All Projects", callback_data="filter_project_all")])
+    keyboard.append([InlineKeyboardButton("◀️ Back", callback_data="back_to_filters")])
+    return InlineKeyboardMarkup(keyboard)

@@ -36,17 +36,23 @@ class TaskPilotAPI:
         except requests.RequestException:
             return None
 
-    def get_user_tasks(self, telegram_id: int) -> List[Dict]:
-        """Get tasks assigned to user"""
+    def get_user_tasks(self, telegram_id: int, status: Optional[str] = None, project_id: Optional[int] = None) -> Dict:
+        """Get tasks assigned to user with optional filters"""
         try:
+            params = {'telegram_id': telegram_id}
+            if status:
+                params['status'] = status
+            if project_id:
+                params['project_id'] = project_id
+
             response = self.session.get(
                 f"{self.base_url}/api/telegram/tasks",
-                params={'telegram_id': telegram_id}
+                params=params
             )
             response.raise_for_status()
-            return response.json().get('tasks', [])
+            return response.json()
         except requests.RequestException:
-            return []
+            return {'tasks': [], 'is_manager': False}
 
     def get_task_details(self, telegram_id: int, task_id: int) -> Optional[Dict]:
         """Get detailed task information"""
@@ -132,3 +138,15 @@ class TaskPilotAPI:
             return response.json().get('projects', [])
         except requests.RequestException:
             return []
+
+    def get_tenant_settings(self, telegram_id: int) -> Optional[Dict]:
+        """Get tenant settings for AI features"""
+        try:
+            response = self.session.get(
+                f"{self.base_url}/api/telegram/settings",
+                params={'telegram_id': telegram_id}
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.RequestException:
+            return None

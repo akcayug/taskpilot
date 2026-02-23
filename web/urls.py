@@ -13,7 +13,8 @@ from .views import (
     TelegramTaskDetailAPIView,
     TelegramTaskStatusAPIView,
     TelegramMembersAPIView,
-    TelegramProjectsAPIView
+    TelegramProjectsAPIView,
+    TelegramSettingsAPIView
 )
 
 urlpatterns = [
@@ -33,4 +34,5 @@ urlpatterns = [
     path('api/telegram/tasks/<int:task_id>/status', TelegramTaskStatusAPIView.as_view(), name='telegram_task_status_api'),
     path('api/telegram/members', TelegramMembersAPIView.as_view(), name='telegram_members_api'),
     path('api/telegram/projects', TelegramProjectsAPIView.as_view(), name='telegram_projects_api'),
+    path('api/telegram/settings', TelegramSettingsAPIView.as_view(), name='telegram_settings_api'),
 ]

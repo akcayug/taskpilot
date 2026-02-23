@@ -546,7 +546,7 @@ class TelegramTasksAPIView(View):
         if not telegram_id:
             return JsonResponse({'error': 'telegram_id required'}, status=400)
 
-        from core.models import User
+        from core.models import User, TenantMembership
         from tasks.models import Task
 
         try:
@@ -554,16 +554,31 @@ class TelegramTasksAPIView(View):
         except User.DoesNotExist:
             return JsonResponse({'error': 'User not linked'}, status=404)
 
-        # Get user's tenant
+        # Get user's tenant and role
         membership = user.memberships.select_related('tenant').first()
         if not membership:
             return JsonResponse({'tasks': []})
 
-        # Get user's assigned tasks
-        tasks = Task.objects.filter(
-            tenant=membership.tenant,
-            assignee=user
-        ).select_related('project').order_by('-created_at')[:50]
+        # Base queryset
+        tasks = Task.objects.filter(tenant=membership.tenant).select_related('project', 'assignee')
+
+        # RBAC: Member sees assigned tasks only, Manager sees all
+        if membership.role != TenantMembership.Role.MANAGER:
+            tasks = tasks.filter(assignee=user)
+
+        # Apply filters
+        status_filter = request.GET.get('status')
+        if status_filter:
+            tasks = tasks.filter(status=status_filter)
+
+        project_filter = request.GET.get('project_id')
+        if project_filter:
+            try:
+                tasks = tasks.filter(project_id=int(project_filter))
+            except (ValueError, TypeError):
+                pass
+
+        tasks = tasks.order_by('-created_at')[:50]
 
         tasks_data = []
         for task in tasks:
@@ -575,10 +590,15 @@ class TelegramTasksAPIView(View):
                 'status_display': task.get_status_display(),
                 'priority': task.priority,
                 'project': task.project.name,
+                'project_id': task.project_id,
+                'assignee': task.assignee.get_full_name() if task.assignee else 'Unassigned',
                 'due_date': task.due_date.isoformat() if task.due_date else None,
             })
 
-        return JsonResponse({'tasks': tasks_data})
+        return JsonResponse({
+            'tasks': tasks_data,
+            'is_manager': membership.role == TenantMembership.Role.MANAGER
+        })
 
     def post(self, request):
         """Create a new task via bot"""
@@ -797,3 +817,35 @@ class TelegramProjectsAPIView(View):
             })
 
         return JsonResponse({'projects': projects_data})
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class TelegramSettingsAPIView(View):
+    """API endpoint to get tenant settings for bot"""
+
+    def get(self, request):
+        telegram_id = request.GET.get('telegram_id')
+
+        if not telegram_id:
+            return JsonResponse({'error': 'telegram_id required'}, status=400)
+
+        from core.models import User
+
+        try:
+            user = User.objects.get(telegram_id=telegram_id)
+        except User.DoesNotExist:
+            return JsonResponse({'error': 'User not linked'}, status=404)
+
+        membership = user.memberships.select_related('tenant').first()
+        if not membership:
+            return JsonResponse({'error': 'No tenant membership'}, status=404)
+
+        # Get or create settings for tenant
+        settings, created = TenantSettings.objects.get_or_create(tenant=membership.tenant)
+
+        return JsonResponse({
+            'ai_enabled': settings.ai_enabled,
+            'ai_system_prompt': settings.ai_system_prompt,
+            'ai_default_mode': settings.ai_default_mode,
+            'ai_default_language': settings.ai_default_language
+        })
