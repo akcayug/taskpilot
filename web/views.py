@@ -336,17 +336,23 @@ class AITextSuggestionAPIView(LoginRequiredMixin, View):
     login_url = 'login'
 
     def post(self, request):
+        import logging
+        logger = logging.getLogger(__name__)
+
         try:
             data = json.loads(request.body)
             text = data.get('text', '').strip()
             mode = data.get('mode', 'fix')  # 'fix' or 'translate'
             field = data.get('field', 'title')  # 'title' or 'description'
 
+            logger.info(f"AI suggestion request: field={field}, mode={mode}, text_length={len(text)}")
+
             if not text:
                 return JsonResponse({'error': 'Text is required'}, status=400)
 
             tenant = getattr(request, 'tenant', None)
             if not tenant:
+                logger.error("No tenant found for AI request")
                 return JsonResponse({'error': 'No tenant found'}, status=403)
 
             # Get tenant settings
@@ -354,7 +360,8 @@ class AITextSuggestionAPIView(LoginRequiredMixin, View):
 
             # Check if AI is enabled
             if not settings.ai_enabled:
-                return JsonResponse({'error': 'AI features are not enabled for your tenant'}, status=403)
+                logger.warning(f"AI request rejected: AI not enabled for tenant {tenant.name}")
+                return JsonResponse({'error': 'AI features are not enabled. Please enable in Settings.'}, status=403)
 
             # Initialize LLM client
             llm_client = WebLLMClient()
@@ -371,6 +378,7 @@ class AITextSuggestionAPIView(LoginRequiredMixin, View):
             )
 
             if not result['success']:
+                logger.error(f"AI processing failed: {result.get('error')}")
                 return JsonResponse({'error': result.get('error', 'Failed to process text')}, status=500)
 
             # Create audit log
@@ -395,9 +403,11 @@ class AITextSuggestionAPIView(LoginRequiredMixin, View):
             })
 
         except json.JSONDecodeError:
+            logger.error("Invalid JSON in AI request")
             return JsonResponse({'error': 'Invalid JSON'}, status=400)
         except Exception as e:
-            return JsonResponse({'error': str(e)}, status=500)
+            logger.exception(f"Unexpected error in AI suggestion: {e}")
+            return JsonResponse({'error': f'Server error: {str(e)}'}, status=500)
 
 
 class TaskListAPIView(LoginRequiredMixin, View):

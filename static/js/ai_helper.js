@@ -33,15 +33,16 @@ $(document).ready(function() {
 
     // Show error alert
     function showError(message) {
+        console.error('AI Helper Error:', message);
         const alert = `
             <div class="alert alert-danger alert-dismissible fade show" role="alert">
                 <strong>Error:</strong> ${escapeHtml(message)}
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
         `;
-        $('.card-body').prepend(alert);
+        $('.task-form-container, .card-body').first().prepend(alert);
         setTimeout(() => {
-            $('.alert').fadeOut(() => $(this).remove());
+            $('.alert').fadeOut(function() { $(this).remove(); });
         }, 5000);
     }
 
@@ -59,7 +60,15 @@ $(document).ready(function() {
         const mode = $btn.data('mode');
         const $field = $('#' + fieldId);
 
+        console.log('AI button clicked:', { fieldId, mode, fieldFound: $field.length > 0 });
+
+        if ($field.length === 0) {
+            showError(`Field with ID "${fieldId}" not found`);
+            return;
+        }
+
         const text = $field.val().trim();
+        console.log('Field text length:', text.length);
 
         if (!text) {
             showError('Please enter some text first');
@@ -85,6 +94,7 @@ $(document).ready(function() {
                 field: fieldId
             }),
             success: function(response) {
+                console.log('AI API success:', response);
                 currentSuggestion = response.suggested;
 
                 // Show modal with suggestion
@@ -97,9 +107,10 @@ $(document).ready(function() {
                 setButtonLoading($btn, false);
             },
             error: function(xhr) {
+                console.error('AI API error:', xhr);
                 setButtonLoading($btn, false);
 
-                const error = xhr.responseJSON?.error || 'Failed to get AI suggestion';
+                const error = xhr.responseJSON?.error || 'Failed to get AI suggestion. Check if AI is enabled in Settings.';
                 showError(error);
             }
         });

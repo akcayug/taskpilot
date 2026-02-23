@@ -117,14 +117,15 @@
     const charCount = document.getElementById('charCount');
 
     function updateCharCount() {
-        const length = textarea.value.length;
-        charCount.textContent = `${length} / 500 characters`;
-        if (length > 450) {
+        // Match backend validation: trim and count
+        const trimmedLength = textarea.value.trim().length;
+        charCount.textContent = `${trimmedLength} / 500 characters`;
+        if (trimmedLength > 450) {
             charCount.classList.add('text-warning');
         } else {
             charCount.classList.remove('text-warning');
         }
-        if (length >= 500) {
+        if (trimmedLength > 500) {
             charCount.classList.remove('text-warning');
             charCount.classList.add('text-danger');
         }
