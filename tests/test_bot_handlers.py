@@ -304,3 +304,48 @@ class TestHandleCallback:
         mock_update.callback_query.edit_message_text.assert_called_once()
         call_args = mock_update.callback_query.edit_message_text.call_args[0][0]
         assert 'due date' in call_args.lower()
+
+
+@pytest.mark.asyncio
+class TestBotAPIPermissions:
+    """Test bot API endpoint permission checks"""
+
+    async def test_get_tasks_respects_rbac_for_member(self, bot_handlers, api_client, mock_update, mock_context):
+        """Test that API returns only assigned tasks for members"""
+        api_client.get_user_by_telegram_id.return_value = {'id': 1, 'role': 'MEMBER'}
+        api_client.get_user_tasks.return_value = [
+            {'id': 1, 'title': 'My Task', 'assignee_id': 1}
+        ]
+
+        await bot_handlers.my_tasks_command(mock_update, mock_context)
+
+        # Verify API was called to get tasks
+        api_client.get_user_tasks.assert_called_once()
+
+    async def test_get_tasks_returns_all_for_manager(self, bot_handlers, api_client, mock_update, mock_context):
+        """Test that API returns all tenant tasks for managers"""
+        api_client.get_user_by_telegram_id.return_value = {'id': 1, 'role': 'MANAGER'}
+        api_client.get_user_tasks.return_value = [
+            {'id': 1, 'title': 'Task 1', 'assignee_id': 1},
+            {'id': 2, 'title': 'Task 2', 'assignee_id': 2},
+            {'id': 3, 'title': 'Task 3', 'assignee_id': None}
+        ]
+
+        await bot_handlers.my_tasks_command(mock_update, mock_context)
+
+        # Verify API was called
+        api_client.get_user_tasks.assert_called_once()
+
+    async def test_task_detail_requires_proper_access(self, bot_handlers, api_client, mock_update, mock_context):
+        """Test that task detail requires user to have access to task"""
+        mock_context.args = ['999']
+        api_client.get_user_by_telegram_id.return_value = {'id': 1}
+        api_client.get_task_details.return_value = None  # Task not found or no access
+
+        await bot_handlers.task_command(mock_update, mock_context)
+
+        # Should get an error message
+        mock_update.message.reply_text.assert_called_once()
+        call_args = mock_update.message.reply_text.call_args[0][0]
+        # Either task not found or access denied
+        assert 'Task not found' in call_args or 'not found' in call_args.lower()

@@ -217,3 +217,120 @@ class TestTenantIsolation:
         roles = set(m.role for m in memberships)
         assert TenantMembership.Role.MANAGER in roles
         assert TenantMembership.Role.MEMBER in roles
+
+
+@pytest.mark.django_db
+class TestTenantIsolationInModels:
+    """Test tenant isolation at model query level"""
+
+    def test_projects_filtered_by_tenant(self, tenant_a, tenant_b):
+        """Projects should be filterable by tenant"""
+        from tasks.models import Project
+
+        project_a = Project.objects.create(
+            tenant=tenant_a,
+            name="Project A",
+            description="Tenant A project"
+        )
+        project_b = Project.objects.create(
+            tenant=tenant_b,
+            name="Project B",
+            description="Tenant B project"
+        )
+
+        # Query projects for tenant A
+        tenant_a_projects = Project.objects.filter(tenant=tenant_a)
+        assert tenant_a_projects.count() == 1
+        assert tenant_a_projects.first().id == project_a.id
+
+        # Query projects for tenant B
+        tenant_b_projects = Project.objects.filter(tenant=tenant_b)
+        assert tenant_b_projects.count() == 1
+        assert tenant_b_projects.first().id == project_b.id
+
+    def test_tasks_filtered_by_tenant(self, tenant_a, tenant_b):
+        """Tasks should be filterable by tenant"""
+        from tasks.models import Project, Task
+
+        project_a = Project.objects.create(tenant=tenant_a, name="Project A")
+        project_b = Project.objects.create(tenant=tenant_b, name="Project B")
+
+        task_a = Task.objects.create(
+            tenant=tenant_a,
+            project=project_a,
+            title="Task A"
+        )
+        task_b = Task.objects.create(
+            tenant=tenant_b,
+            project=project_b,
+            title="Task B"
+        )
+
+        # Query tasks for tenant A
+        tenant_a_tasks = Task.objects.filter(tenant=tenant_a)
+        assert tenant_a_tasks.count() == 1
+        assert tenant_a_tasks.first().id == task_a.id
+
+        # Query tasks for tenant B
+        tenant_b_tasks = Task.objects.filter(tenant=tenant_b)
+        assert tenant_b_tasks.count() == 1
+        assert tenant_b_tasks.first().id == task_b.id
+
+    def test_financial_snapshots_filtered_by_tenant(self, tenant_a, tenant_b, user_a, user_b):
+        """Financial snapshots should be isolated by tenant"""
+        from tasks.models import Project, ProjectFinancialSnapshot
+        from decimal import Decimal
+
+        project_a = Project.objects.create(
+            tenant=tenant_a,
+            name="Project A",
+            contract_total_amount=Decimal('100000.00')
+        )
+        project_b = Project.objects.create(
+            tenant=tenant_b,
+            name="Project B",
+            contract_total_amount=Decimal('200000.00')
+        )
+
+        snapshot_a = ProjectFinancialSnapshot.objects.create(
+            project=project_a,
+            total_completed_work=Decimal('50000.00'),
+            total_paid_amount=Decimal('40000.00'),
+            total_retention_earned=Decimal('5000.00'),
+            created_by=user_a
+        )
+        snapshot_b = ProjectFinancialSnapshot.objects.create(
+            project=project_b,
+            total_completed_work=Decimal('100000.00'),
+            total_paid_amount=Decimal('80000.00'),
+            total_retention_earned=Decimal('10000.00'),
+            created_by=user_b
+        )
+
+        # Query snapshots for tenant A projects
+        tenant_a_snapshots = ProjectFinancialSnapshot.objects.filter(project__tenant=tenant_a)
+        assert tenant_a_snapshots.count() == 1
+        assert tenant_a_snapshots.first().id == snapshot_a.id
+
+        # Query snapshots for tenant B projects
+        tenant_b_snapshots = ProjectFinancialSnapshot.objects.filter(project__tenant=tenant_b)
+        assert tenant_b_snapshots.count() == 1
+        assert tenant_b_snapshots.first().id == snapshot_b.id
+
+    def test_task_automatic_tenant_assignment(self, tenant_a):
+        """Tasks should automatically inherit tenant from project"""
+        from tasks.models import Project, Task
+
+        project = Project.objects.create(
+            tenant=tenant_a,
+            name="Test Project"
+        )
+
+        # Create task without explicitly setting tenant
+        task = Task.objects.create(
+            project=project,
+            title="Test Task"
+        )
+
+        # Task should automatically get tenant from project
+        assert task.tenant == tenant_a

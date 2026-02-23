@@ -700,7 +700,7 @@ class TelegramTasksAPIView(View):
             project_id = data.get('project_id')
             priority = data.get('priority', 'MEDIUM')
 
-            from core.models import User
+            from core.models import User, TenantMembership
             from tasks.models import Task, Project
 
             try:
@@ -708,8 +708,14 @@ class TelegramTasksAPIView(View):
             except User.DoesNotExist:
                 return JsonResponse({'error': 'User not linked'}, status=404)
 
+            # Get user's tenant
+            membership = user.memberships.select_related('tenant').first()
+            if not membership:
+                return JsonResponse({'error': 'No tenant membership'}, status=403)
+
             try:
-                project = Project.objects.get(id=project_id)
+                # Verify project belongs to user's tenant
+                project = Project.objects.get(id=project_id, tenant=membership.tenant)
             except Project.DoesNotExist:
                 return JsonResponse({'error': 'Project not found'}, status=404)
 
@@ -772,7 +778,7 @@ class TelegramTaskDetailAPIView(View):
         if not telegram_id:
             return JsonResponse({'error': 'telegram_id required'}, status=400)
 
-        from core.models import User
+        from core.models import User, TenantMembership
         from tasks.models import Task
 
         try:
@@ -780,11 +786,24 @@ class TelegramTaskDetailAPIView(View):
         except User.DoesNotExist:
             return JsonResponse({'error': 'User not linked'}, status=404)
 
+        # Get user's tenant and role
+        membership = user.memberships.select_related('tenant').first()
+        if not membership:
+            return JsonResponse({'error': 'No tenant membership'}, status=403)
+
         try:
-            task = Task.objects.select_related('project', 'assignee').get(
-                id=task_id,
-                assignee=user
-            )
+            # Managers can view any task in tenant, members only their assigned tasks
+            if membership.role == TenantMembership.Role.MANAGER:
+                task = Task.objects.select_related('project', 'assignee').get(
+                    id=task_id,
+                    tenant=membership.tenant
+                )
+            else:
+                task = Task.objects.select_related('project', 'assignee').get(
+                    id=task_id,
+                    tenant=membership.tenant,
+                    assignee=user
+                )
         except Task.DoesNotExist:
             return JsonResponse({'error': 'Task not found'}, status=404)
 
@@ -811,7 +830,7 @@ class TelegramTaskStatusAPIView(View):
             telegram_id = data.get('telegram_id')
             new_status = data.get('status')
 
-            from core.models import User
+            from core.models import User, TenantMembership
             from tasks.models import Task
             from tasks.services import TaskService
 
@@ -820,8 +839,17 @@ class TelegramTaskStatusAPIView(View):
             except User.DoesNotExist:
                 return JsonResponse({'error': 'User not linked'}, status=404)
 
+            # Get user's tenant and role
+            membership = user.memberships.select_related('tenant').first()
+            if not membership:
+                return JsonResponse({'error': 'No tenant membership'}, status=403)
+
             try:
-                task = Task.objects.get(id=task_id, assignee=user)
+                # Managers can update any task in tenant, members only their assigned tasks
+                if membership.role == TenantMembership.Role.MANAGER:
+                    task = Task.objects.get(id=task_id, tenant=membership.tenant)
+                else:
+                    task = Task.objects.get(id=task_id, tenant=membership.tenant, assignee=user)
             except Task.DoesNotExist:
                 return JsonResponse({'error': 'Task not found'}, status=404)
 
