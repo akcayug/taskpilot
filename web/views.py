@@ -382,21 +382,6 @@ class AITextSuggestionAPIView(LoginRequiredMixin, View):
                 logger.error(f"AI processing failed: {result.get('error')}")
                 return JsonResponse({'error': result.get('error', 'Failed to process text')}, status=500)
 
-            # Create audit log
-            from audit.models import AuditLog
-            AuditLog.objects.create(
-                user=request.user,
-                action='AI_SUGGESTION',
-                resource_type='Task',
-                resource_id=None,
-                changes={
-                    'field': field,
-                    'mode': mode,
-                    'original': text,
-                    'suggested': result['text']
-                }
-            )
-
             return JsonResponse({
                 'original': text,
                 'suggested': result['text'],
