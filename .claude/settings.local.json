@@ -29,7 +29,12 @@
       "Bash(python -m pip:*)",
       "Bash(ls:*)",
       "Bash(git push:*)",
-      "Bash(python -c:*)"
+      "Bash(python -c:*)",
+      "Bash(python -m pytest:*)",
+      "Bash(dir:*)",
+      "Bash(where:*)",
+      "Bash(\"C:\\\\Users\\\\Ugur.Akcay\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python312\\\\python.exe\" -m pytest)",
+      "Bash(\"C:\\\\Users\\\\Ugur.Akcay\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python312\\\\python.exe\" -m pytest:*)"
     ]
   }
 }

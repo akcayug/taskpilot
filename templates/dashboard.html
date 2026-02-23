@@ -94,8 +94,8 @@
         </div>
     </div>
 
-    <!-- Tasks Table -->
-    <div class="card">
+    <!-- Tasks Table (Desktop) -->
+    <div class="card d-none d-md-block">
         <div class="card-header">
             <h5 class="mb-0">
                 <i data-lucide="list" class="icon-sm"></i>
@@ -118,6 +118,26 @@
                 <tbody>
                 </tbody>
             </table>
+        </div>
+    </div>
+
+    <!-- Tasks Cards (Mobile) -->
+    <div class="d-md-none" id="mobileTasksContainer">
+        <div id="mobileTasksList" class="mobile-tasks-list">
+            <!-- Cards will be dynamically populated -->
+        </div>
+
+        <!-- Mobile Pagination -->
+        <div class="mobile-pagination mt-3 d-flex justify-content-between align-items-center">
+            <button id="mobilePrevBtn" class="btn btn-sm btn-outline-primary" disabled>
+                <i data-lucide="chevron-left" class="icon-sm"></i>
+                Previous
+            </button>
+            <span id="mobilePaginationInfo" class="text-muted small"></span>
+            <button id="mobileNextBtn" class="btn btn-sm btn-outline-primary">
+                Next
+                <i data-lucide="chevron-right" class="icon-sm"></i>
+            </button>
         </div>
     </div>
 </div>
