@@ -6,11 +6,11 @@ from .views import (
     DashboardView,
     SettingsView,
     TaskFormView,
-    TaskFormDemoView,
     AITextSuggestionAPIView,
     TaskListAPIView,
     TaskInlineUpdateAPIView,
     ExportTasksView,
+    MembersAPIView,
     TelegramLinkAPIView,
     TelegramUserAPIView,
     TelegramTasksAPIView,
@@ -37,6 +37,7 @@ urlpatterns = [
     # API endpoints
     path('api/tasks/', TaskListAPIView.as_view(), name='api_tasks'),
     path('api/tasks/<int:task_id>/', TaskInlineUpdateAPIView.as_view(), name='task_inline_update'),
+    path('api/members/', MembersAPIView.as_view(), name='api_members'),
     path('api/ai-suggest/', AITextSuggestionAPIView.as_view(), name='ai_suggest'),
     path('export/tasks/', ExportTasksView.as_view(), name='export_tasks'),
 

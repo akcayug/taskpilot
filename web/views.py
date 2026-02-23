@@ -495,8 +495,8 @@ class TaskListAPIView(LoginRequiredMixin, View):
                 'priority_value': task.priority,
                 'status': task.get_status_display(),
                 'status_value': task.status,
-                'created_at': task.created_at.strftime('%Y-%m-%d %H:%M'),
-                'updated_at': task.updated_at.strftime('%Y-%m-%d %H:%M')
+                'created_at': task.created_at.isoformat(),
+                'updated_at': task.updated_at.isoformat()
             })
 
         return JsonResponse({
@@ -659,7 +659,7 @@ class TaskInlineUpdateAPIView(LoginRequiredMixin, View):
                 'priority_value': task.priority,
                 'status': task.get_status_display(),
                 'status_value': task.status,
-                'updated_at': task.updated_at.strftime('%Y-%m-%d %H:%M:%S')
+                'updated_at': task.updated_at.isoformat()
             })
 
         except json.JSONDecodeError:
@@ -718,6 +718,35 @@ class ExportTasksView(LoginRequiredMixin, View):
             ])
 
         return response
+
+
+class MembersAPIView(LoginRequiredMixin, View):
+    """API endpoint to get tenant members for dropdowns"""
+    login_url = 'login'
+
+    def get(self, request):
+        tenant = getattr(request, 'tenant', None)
+
+        if not tenant:
+            return JsonResponse({'error': 'No tenant found'}, status=403)
+
+        # Get all members of the tenant
+        from core.models import TenantMembership
+        memberships = TenantMembership.objects.filter(
+            tenant=tenant
+        ).select_related('user')
+
+        members = []
+        for membership in memberships:
+            user = membership.user
+            members.append({
+                'id': user.id,
+                'full_name': user.get_full_name() or user.email,
+                'email': user.email,
+                'role': membership.role
+            })
+
+        return JsonResponse({'members': members})
 
 
 # Telegram Bot API Views

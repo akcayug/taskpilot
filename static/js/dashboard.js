@@ -14,10 +14,13 @@ $(document).ready(function() {
     // Fetch tenant members for assignee dropdown (managers only)
     if (isManager) {
         $.ajax({
-            url: '/api/telegram/members',
+            url: '/api/members/',
             method: 'GET',
             success: function(response) {
                 tenantMembers = response.members || [];
+            },
+            error: function(xhr) {
+                console.error('Failed to load team members:', xhr);
             }
         });
     }
