@@ -34,7 +34,11 @@
       "Bash(dir:*)",
       "Bash(where:*)",
       "Bash(\"C:\\\\Users\\\\Ugur.Akcay\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python312\\\\python.exe\" -m pytest)",
-      "Bash(\"C:\\\\Users\\\\Ugur.Akcay\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python312\\\\python.exe\" -m pytest:*)"
+      "Bash(\"C:\\\\Users\\\\Ugur.Akcay\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python312\\\\python.exe\" -m pytest:*)",
+      "Bash(python manage.py check:*)",
+      "Bash(python manage.py makemigrations:*)",
+      "Bash(git tag:*)",
+      "Bash(winget upgrade:*)"
     ]
   }
 }

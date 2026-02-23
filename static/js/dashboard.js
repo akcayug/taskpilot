@@ -290,9 +290,14 @@ $(document).ready(function() {
                     data: null,
                     orderable: false,
                     render: function(data, type, row) {
-                        return `<button class="btn btn-sm btn-primary edit-btn" title="Edit">
-                                    <i data-lucide="edit-2" class="icon-sm"></i>
-                                </button>`;
+                        return `<div class="btn-group btn-group-sm" role="group">
+                                    <a href="/tasks/${row.id}/edit/" class="btn btn-outline-primary" title="Edit Task">
+                                        <i data-lucide="edit" class="icon-sm"></i>
+                                    </a>
+                                    <button class="btn btn-outline-secondary edit-btn" title="Quick Edit">
+                                        <i data-lucide="edit-2" class="icon-sm"></i>
+                                    </button>
+                                </div>`;
                     }
                 }
             ],
@@ -462,8 +467,8 @@ $(document).ready(function() {
         // Task card click handler (delegate for dynamic content)
         $('#mobileTasksList').on('click', '.task-card', function() {
             const taskId = $(this).data('task-id');
-            // TODO: Navigate to task detail page
-            console.log('Task clicked:', taskId);
+            // Navigate to task edit page
+            window.location.href = `/tasks/${taskId}/edit/`;
         });
     }
 

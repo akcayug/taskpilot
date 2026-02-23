@@ -1,0 +1,370 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if task %}Edit Task{% else %}New Task{% endif %} - TaskPilot{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Mobile-first responsive design */
+    .task-form-container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 1rem;
+    }
+
+    @media (min-width: 768px) {
+        .task-form-container {
+            padding: 2rem;
+        }
+    }
+
+    .ai-btn {
+        transition: all 0.2s;
+        font-size: 0.875rem;
+    }
+
+    .ai-btn:hover {
+        transform: translateY(-1px);
+    }
+
+    .ai-btn.loading {
+        position: relative;
+        color: transparent;
+    }
+
+    .ai-btn.loading::after {
+        content: '';
+        position: absolute;
+        width: 16px;
+        height: 16px;
+        top: 50%;
+        left: 50%;
+        margin-left: -8px;
+        margin-top: -8px;
+        border: 2px solid currentColor;
+        border-radius: 50%;
+        border-top-color: transparent;
+        animation: spinner 0.6s linear infinite;
+    }
+
+    @keyframes spinner {
+        to { transform: rotate(360deg); }
+    }
+
+    .form-section {
+        background: #fff;
+        border-radius: 0.5rem;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .form-section h5 {
+        color: #495057;
+        font-size: 1rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid #e9ecef;
+    }
+
+    .required-field::after {
+        content: " *";
+        color: #dc3545;
+    }
+
+    .ai-helper-wrapper {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        margin-top: 0.5rem;
+    }
+
+    @media (max-width: 576px) {
+        .ai-btn {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+        }
+
+        .form-section {
+            padding: 1rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="task-form-container">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>
+            <i data-lucide="{% if task %}edit{% else %}plus-circle{% endif %}" class="icon-sm"></i>
+            {% if task %}Edit Task{% else %}New Task{% endif %}
+        </h2>
+        <a href="{% url 'dashboard' %}" class="btn btn-sm btn-outline-secondary">
+            <i data-lucide="x" class="icon-sm"></i>
+            Cancel
+        </a>
+    </div>
+
+    <!-- Error Messages -->
+    {% if form.errors %}
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <strong>Please correct the following errors:</strong>
+        <ul class="mb-0 mt-2">
+            {% for field, errors in form.errors.items %}
+                {% for error in errors %}
+                <li>{{ field|title }}: {{ error }}</li>
+                {% endfor %}
+            {% endfor %}
+        </ul>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endif %}
+
+    <!-- Success Messages -->
+    {% if messages %}
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        {% endfor %}
+    {% endif %}
+
+    <form method="post" id="taskForm">
+        {% csrf_token %}
+
+        <!-- Basic Information Section -->
+        <div class="form-section">
+            <h5>
+                <i data-lucide="info" class="icon-sm"></i>
+                Basic Information
+            </h5>
+
+            <!-- Project -->
+            <div class="mb-3">
+                <label for="project" class="form-label fw-bold required-field">Project</label>
+                <select class="form-select" id="project" name="project" required>
+                    <option value="">Select a project...</option>
+                    {% for proj in projects %}
+                    <option value="{{ proj.id }}" {% if task and task.project.id == proj.id %}selected{% endif %}>
+                        {{ proj.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Title with AI Helper -->
+            <div class="mb-3">
+                <label for="title" class="form-label fw-bold required-field">Title</label>
+                <textarea class="form-control" id="title" name="title" rows="2"
+                          maxlength="200" required
+                          placeholder="Brief, clear task title...">{% if task %}{{ task.title }}{% endif %}</textarea>
+                {% if ai_enabled %}
+                <div class="ai-helper-wrapper">
+                    <button type="button" class="btn btn-sm btn-outline-primary ai-btn"
+                            data-field="title" data-mode="fix">
+                        <i data-lucide="wand-2" class="icon-sm"></i>
+                        Fix Language
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary ai-btn"
+                            data-field="title" data-mode="translate">
+                        <i data-lucide="languages" class="icon-sm"></i>
+                        Translate
+                    </button>
+                </div>
+                {% endif %}
+                <small class="text-muted">Clear, actionable task title (max 200 characters)</small>
+            </div>
+
+            <!-- Description with AI Helper -->
+            <div class="mb-3">
+                <label for="description" class="form-label fw-bold">Description</label>
+                <textarea class="form-control" id="description" name="description" rows="5"
+                          placeholder="Detailed task description, requirements, acceptance criteria...">{% if task %}{{ task.description }}{% endif %}</textarea>
+                {% if ai_enabled %}
+                <div class="ai-helper-wrapper">
+                    <button type="button" class="btn btn-sm btn-outline-primary ai-btn"
+                            data-field="description" data-mode="fix">
+                        <i data-lucide="wand-2" class="icon-sm"></i>
+                        Fix Language
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary ai-btn"
+                            data-field="description" data-mode="translate">
+                        <i data-lucide="languages" class="icon-sm"></i>
+                        Translate
+                    </button>
+                </div>
+                {% endif %}
+                <small class="text-muted">Provide context, requirements, and expected outcome</small>
+            </div>
+        </div>
+
+        <!-- Task Details Section -->
+        <div class="form-section">
+            <h5>
+                <i data-lucide="sliders" class="icon-sm"></i>
+                Task Details
+            </h5>
+
+            <div class="row">
+                <!-- Status -->
+                <div class="col-md-6 mb-3">
+                    <label for="status" class="form-label fw-bold required-field">Status</label>
+                    <select class="form-select" id="status" name="status" required>
+                        <option value="TODO" {% if not task or task.status == 'TODO' %}selected{% endif %}>
+                            📋 To Do
+                        </option>
+                        <option value="IN_PROGRESS" {% if task and task.status == 'IN_PROGRESS' %}selected{% endif %}>
+                            ⏳ In Progress
+                        </option>
+                        <option value="DONE" {% if task and task.status == 'DONE' %}selected{% endif %}>
+                            ✅ Done
+                        </option>
+                        <option value="ARCHIVED" {% if task and task.status == 'ARCHIVED' %}selected{% endif %}>
+                            📦 Archived
+                        </option>
+                    </select>
+                </div>
+
+                <!-- Priority -->
+                <div class="col-md-6 mb-3">
+                    <label for="priority" class="form-label fw-bold required-field">Priority</label>
+                    <select class="form-select" id="priority" name="priority" required>
+                        <option value="LOW" {% if not task or task.priority == 'LOW' %}selected{% endif %}>
+                            🟢 Low
+                        </option>
+                        <option value="MEDIUM" {% if not task or task.priority == 'MEDIUM' %}selected{% endif %}>
+                            🟡 Medium
+                        </option>
+                        <option value="HIGH" {% if task and task.priority == 'HIGH' %}selected{% endif %}>
+                            🔴 High
+                        </option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="row">
+                <!-- Assignee -->
+                <div class="col-md-6 mb-3">
+                    <label for="assignee" class="form-label fw-bold">Assignee</label>
+                    <select class="form-select" id="assignee" name="assignee">
+                        <option value="">Unassigned</option>
+                        {% for member in team_members %}
+                        <option value="{{ member.id }}"
+                                {% if task and task.assignee and task.assignee.id == member.id %}selected{% endif %}>
+                            {{ member.get_full_name }} ({{ member.email }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <small class="text-muted">Who is responsible for this task</small>
+                </div>
+
+                <!-- Due Date -->
+                <div class="col-md-6 mb-3">
+                    <label for="due_date" class="form-label fw-bold">Due Date</label>
+                    <input type="date" class="form-control" id="due_date" name="due_date"
+                           value="{% if task and task.due_date %}{{ task.due_date|date:'Y-m-d' }}{% endif %}">
+                    <small class="text-muted">Target completion date</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="d-flex justify-content-between align-items-center gap-2">
+            <a href="{% url 'dashboard' %}" class="btn btn-secondary">
+                <i data-lucide="arrow-left" class="icon-sm"></i>
+                <span class="d-none d-sm-inline">Back</span>
+            </a>
+
+            <div class="d-flex gap-2">
+                {% if task %}
+                <button type="submit" name="action" value="save" class="btn btn-primary">
+                    <i data-lucide="save" class="icon-sm"></i>
+                    Update Task
+                </button>
+                {% else %}
+                <button type="submit" name="action" value="save" class="btn btn-success">
+                    <i data-lucide="plus-circle" class="icon-sm"></i>
+                    Create Task
+                </button>
+                <button type="submit" name="action" value="save_and_new" class="btn btn-outline-success d-none d-md-inline-block">
+                    <i data-lucide="copy-plus" class="icon-sm"></i>
+                    Save & New
+                </button>
+                {% endif %}
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- AI Suggestion Modal -->
+<div class="modal fade" id="aiSuggestionModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i data-lucide="sparkles" class="icon-sm"></i>
+                    AI Suggestion
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-3">
+                    <div class="col-12 col-md-6">
+                        <h6 class="text-muted mb-2">
+                            <i data-lucide="file-text" class="icon-sm"></i>
+                            Original:
+                        </h6>
+                        <div class="p-3 bg-light rounded" id="originalText" style="white-space: pre-wrap; min-height: 100px;"></div>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <h6 class="text-success mb-2">
+                            <i data-lucide="sparkles" class="icon-sm"></i>
+                            Suggested:
+                        </h6>
+                        <div class="p-3 bg-success bg-opacity-10 rounded border border-success" id="suggestedText" style="white-space: pre-wrap; min-height: 100px;"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i data-lucide="x" class="icon-sm"></i>
+                    Cancel
+                </button>
+                <button type="button" class="btn btn-success" id="applyBtn">
+                    <i data-lucide="check" class="icon-sm"></i>
+                    Apply Suggestion
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/ai_helper.js"></script>
+<script>
+    // Form validation feedback
+    (function() {
+        'use strict';
+        var forms = document.querySelectorAll('#taskForm');
+        Array.prototype.slice.call(forms).forEach(function(form) {
+            form.addEventListener('submit', function(event) {
+                if (!form.checkValidity()) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+                form.classList.add('was-validated');
+            }, false);
+        });
+    })();
+
+    // Auto-resize textareas
+    document.querySelectorAll('textarea').forEach(textarea => {
+        textarea.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+        });
+    });
+</script>
+{% endblock %}

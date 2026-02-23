@@ -83,6 +83,128 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         return context
 
 
+class TaskFormView(LoginRequiredMixin, TemplateView):
+    """Task creation and editing view"""
+    template_name = 'task_form.html'
+    login_url = 'login'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        tenant = getattr(self.request, 'tenant', None)
+        task_id = kwargs.get('task_id')
+
+        if tenant:
+            # Get AI settings
+            settings, _ = TenantSettings.objects.get_or_create(tenant=tenant)
+            context['ai_enabled'] = settings.ai_enabled
+
+            # Get projects for dropdown
+            context['projects'] = Project.objects.filter(tenant=tenant).order_by('name')
+
+            # Get team members for assignee dropdown
+            from core.models import TenantMembership
+            memberships = TenantMembership.objects.filter(tenant=tenant).select_related('user')
+            context['team_members'] = [m.user for m in memberships]
+
+            # If editing, get the task
+            if task_id:
+                context['task'] = get_object_or_404(Task, id=task_id, tenant=tenant)
+
+        return context
+
+    def post(self, request, *args, **kwargs):
+        tenant = getattr(request, 'tenant', None)
+        tenant_role = getattr(request, 'tenant_role', None)
+        task_id = kwargs.get('task_id')
+
+        if not tenant:
+            messages.error(request, "No tenant found")
+            return redirect('dashboard')
+
+        # Get form data
+        project_id = request.POST.get('project')
+        title = request.POST.get('title')
+        description = request.POST.get('description', '')
+        status = request.POST.get('status', 'TODO')
+        priority = request.POST.get('priority', 'MEDIUM')
+        assignee_id = request.POST.get('assignee')
+        due_date = request.POST.get('due_date') or None
+        action = request.POST.get('action', 'save')
+
+        # Validate required fields
+        if not project_id or not title:
+            messages.error(request, "Project and Title are required")
+            return self.get(request, *args, **kwargs)
+
+        try:
+            project = Project.objects.get(id=project_id, tenant=tenant)
+        except Project.DoesNotExist:
+            messages.error(request, "Invalid project selected")
+            return self.get(request, *args, **kwargs)
+
+        # Get assignee if provided
+        assignee = None
+        if assignee_id:
+            try:
+                assignee = User.objects.get(id=assignee_id)
+                # Verify assignee belongs to this tenant
+                from core.models import TenantMembership
+                if not TenantMembership.objects.filter(user=assignee, tenant=tenant).exists():
+                    messages.error(request, "Invalid assignee selected")
+                    return self.get(request, *args, **kwargs)
+            except User.DoesNotExist:
+                messages.error(request, "Invalid assignee selected")
+                return self.get(request, *args, **kwargs)
+
+        # Create or update task
+        if task_id:
+            # Update existing task
+            task = get_object_or_404(Task, id=task_id, tenant=tenant)
+
+            # Check permissions: members can only edit their own tasks
+            if tenant_role != 'MANAGER' and task.assignee != request.user:
+                messages.error(request, "You don't have permission to edit this task")
+                return redirect('dashboard')
+
+            # Members cannot change assignee
+            if tenant_role != 'MANAGER' and assignee and assignee != task.assignee:
+                messages.error(request, "Only managers can reassign tasks")
+                assignee = task.assignee
+
+            task.project = project
+            task.title = title
+            task.description = description
+            task.status = status
+            task.priority = priority
+            task.assignee = assignee
+            task.due_date = due_date
+            task.save()
+
+            messages.success(request, f"Task '{task.title}' updated successfully")
+            return redirect('dashboard')
+
+        else:
+            # Create new task
+            task = Task.objects.create(
+                tenant=tenant,
+                project=project,
+                title=title,
+                description=description,
+                status=status,
+                priority=priority,
+                assignee=assignee,
+                due_date=due_date
+            )
+
+            messages.success(request, f"Task '{task.title}' created successfully")
+
+            # Check if "Save & New" was clicked
+            if action == 'save_and_new':
+                return redirect('task_create')
+            else:
+                return redirect('dashboard')
+
+
 class TaskFormDemoView(LoginRequiredMixin, TemplateView):
     """Demo view for AI helper on task forms"""
     template_name = 'task_form_demo.html'
